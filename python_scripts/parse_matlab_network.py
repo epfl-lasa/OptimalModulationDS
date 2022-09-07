@@ -47,3 +47,5 @@ print(net.forward(rob_pos))
 
 rob_pos[DOF:] = torch.tensor([0, 4]) #input point at (0,4), so distance = 4
 print(net.forward(rob_pos))
+
+torch.save(net.state_dict(), 'data/mlp_state_dict.pt')
