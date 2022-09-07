@@ -25,7 +25,7 @@ axis equal
 title('Nominal DS')
 
 %% obstacle
-load('obstacles/net_bean.mat')
+load('../obstacles/net_bean.mat')
 [y_f, dy_f] = tanhNN(net);
 [val, grad] = getGradAnalytical(y_f, dy_f, x);
 Z_mg = reshape(val,size(X_mg));

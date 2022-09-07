@@ -23,7 +23,7 @@ l = streamslice(X_mg,Y_mg,U_nominal,V_nominal);
 axis tight
 title('Nominal DS')
 %% obstacle
-load('obstacles/net_bean.mat')
+load('../obstacles/net_bean.mat')
 [y_f, dy_f] = tanhNN(net);
 [val, grad] = getGradAnalytical(y_f, dy_f, x);
 %% plotting

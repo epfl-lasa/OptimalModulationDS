@@ -1,0 +1,53 @@
+clc
+clear all
+load('data/200k_nn.mat')
+% only keep point where ee is close to the goal
+tt_ratio = 0.9;
+idx_tt = floor(tt_ratio*length(dataset));
+data_train = dataset(1:idx_tt,:);
+data_test = dataset((idx_tt+1):end,:);
+sz = 50;
+layers = [
+    sequenceInputLayer((size(data_train,2)-1)*3)
+    fullyConnectedLayer(sz)
+    reluLayer()
+    fullyConnectedLayer(sz)
+    reluLayer()
+    fullyConnectedLayer(sz)
+    reluLayer()
+    fullyConnectedLayer(1)
+    regressionLayer()];
+X = data_train(:,2:end);
+X = [X sin(X) cos(X)];
+Y = data_train(:,1);
+options = trainingOptions('rmsprop', ...
+    'MaxEpochs',10000,...
+    'InitialLearnRate',1e-2, ...
+    'Verbose',true, ...
+    'LearnRateSchedule','piecewise', ...
+    'LearnRateDropFactor',0.5, ...
+    'LearnRateDropPeriod',1000, ...
+    'Plots','training-progress');
+
+    %'Plots','training-progress',...
+    %'ValidationData',{data_test(:,2:end)',data_test(:,1)'});
+
+%%
+net = trainNetwork(X',Y',layers,options);
+pred_res = predict(net, data_test(:,2:end)'); 
+ground_truth = data_test(:,1);
+err = (pred_res'-ground_truth);
+hist(err);
+mean(err);
+save('data/net50_relu_pos','net')
+% net = assembleNetwork(layers);
+% tic
+% pred_res = predict(net, data_test');
+% toc
+
+%%
+q = [0,0,2,3];
+pos_enc = @(x)[x sin(x) cos(x)];
+predict(net, pos_enc(q)')
+predict(net, q')
+
