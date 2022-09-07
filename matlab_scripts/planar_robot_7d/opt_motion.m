@@ -26,9 +26,9 @@ q_max = [repmat(k_lim*pi,[1,7]), 10, 10];
 
 %% PROBLEM SET UP
 dt = 0.05; %[s]
-H = 20; % prediction horizon
+H = 10; % prediction horizon
 N_ITER = 150;
-u1_max = 2; u1_min = -2;
+u1_max = 1; u1_min = -1;
 
 x1 = SX.sym('x1'); x2 = SX.sym('x2');
 x3 = SX.sym('x3'); x4 = SX.sym('x4');
@@ -53,10 +53,12 @@ A = -1*eye(7);
 attr = repmat(-0.1*pi,[1,7])';
 init_pos = repmat(0.1*pi,[1,7])';
 
-obs_pos = [7; 0];
+obs_pos = [7; 3];
 obs_r = 1;
 
-rhs = A*(state - attr)./abs(state - attr) + controls;
+%rhs = A*(state - attr)./abs(state - attr) + controls;
+rhs = A*(state - attr) + controls;
+
 % rotm = @(ang)[cos(ang) sin(ang);
 %              -sin(ang) cos(ang)];
 % rhs = rotm(controls(1)) * A*(state - attr)/max(0.5,norm(state - attr));
@@ -73,11 +75,11 @@ X = SX.sym('X',n_s,(H+1));
 obj = 0; % Objective function
 g = [];  % constraints vector
 
-W_SL = 0.1*eye(n_s,n_s);  % weighing matrix for states in lagrangian term
+W_SL = 0.01*eye(n_s,n_s);  % weighing matrix for states in lagrangian term
 W_SM = 10*H*eye(n_s,n_s);  % weighing matrix for states in mayer term
 
-W_C = eye(n_c,n_c);  % weighing matrix for controls
-W_CR = 0.1*eye(n_c,n_c);  % weighing matrix for control rates
+W_C = 0*0.001*eye(n_c,n_c);  % weighing matrix for controls
+W_CR = 0*0.1*eye(n_c,n_c);  % weighing matrix for control rates
 
 st  = X(:,1); % initial state
 g = [g;st-P(1:DOF)]; % initial condition constraints
@@ -198,7 +200,7 @@ while(mpciter < N_ITER && norm(x0-x_ref)>1e-1)
         'lbg', args.lbg, 'ubg', args.ubg,'p',args.p);
     u_traj = reshape(full(sol.x(n_s*(H+1)+1:end))',n_c,H)'; % get controls from the solution
     u_opt= [u_opt ; u_traj(1,:)];
-
+    u_traj(1,:)
     x_traj = reshape(full(sol.x(1:n_s*(H+1)))',n_s,H+1)'; % get solution trajectory
     all_traj(:,1:n_s,mpciter+1)= x_traj; % store solution trajectory
 
