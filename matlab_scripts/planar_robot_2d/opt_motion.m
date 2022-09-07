@@ -186,7 +186,7 @@ while(mpciter < N_ITER && norm(x0-x_ref)>1e-1)
     if mpciter == 1
         prepare_plot_planar_jspace
     end
-    %online_plot_planar_jspace
+    online_plot_planar_jspace
     %pause(0.5)
 end
 main_loop_time = toc(main_loop);
