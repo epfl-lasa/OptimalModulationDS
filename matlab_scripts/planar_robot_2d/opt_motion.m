@@ -155,6 +155,7 @@ u_opt=[];
 % the main simulaton loop... it works as long as the error is greater
 % than 10^-6 and the number of mpc steps is less than its maximum
 % value.
+pause(1)
 main_loop = tic;
 while(mpciter < N_ITER && norm(x0-x_ref)>1e-1)
     args.p   = [x0;x_ref]; % set the values of the parameters vector

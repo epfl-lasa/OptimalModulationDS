@@ -1,0 +1,35 @@
+clc
+clear all
+addpath('../planar_robot_7d/')
+rng('default')
+%% Constants and Parameters
+H = 10;
+D = 2;
+MU_ARR = zeros(D, H);
+SIGMA = 0.3;
+dT = 0.1;
+N_TRAJ = 3;
+pos_init = zeros(D, 1);
+pos_goal = pos_init+1;
+gamma_vec = [0.98.^linspace(1,H-1,H-1), 0.98^H];
+beta = 0.9;
+mu_alpha = 0.5;
+%% lambdas
+get_norm_samples = @(MU_ARR, SIGMA, N_TRAJ)...
+                        normrnd(repmat(MU_ARR,[1,1,N_TRAJ]), SIGMA);
+INT_MAT = tril(ones(H));
+get_rollout = @(pos_init, u_sampl, dT) pos_init + ...
+              pagetranspose(pagemtimes(dT*INT_MAT,pagetranspose(u_sampl)));
+
+calc_reaching_cost = @(rollout, goal) squeeze(vecnorm(rollout - goal,2,1))';
+w_fun = @(cost) exp(-1/beta * sum(gamma_vec .* cost,2));
+%mu_upd_fun = @(mu, w, u) (1-mu_alpha)*mu +
+
+%% MPPI
+u = get_norm_samples(MU_ARR,SIGMA,N_TRAJ);
+rollout = get_rollout(pos_init, u, dT);
+cost = calc_reaching_cost(rollout, pos_goal);
+w = w_fun(cost);
+w = w/sum(w);
+w = reshape(repmat(w,[1,H]), [1, H ,N_TRAJ])
+mu_upd = w.*u
