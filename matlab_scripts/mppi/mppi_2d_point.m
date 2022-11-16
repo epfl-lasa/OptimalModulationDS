@@ -7,7 +7,7 @@ rng('default')
 N_ITER = 1000;
 H = 30;
 D = 2;
-SIGMA = [1, 0.5, 0.1];
+SIGMA = [0.1];
 N_POL = size(SIGMA,2);
 MU_ARR = zeros(D, H, N_POL);
 
@@ -70,6 +70,7 @@ for i = 1:1:N_ITER
 
         v_rollout = get_rollout(cur_vel, u, dT);
         rollout = get_rollout(cur_pos, v_rollout, dT);
+
         cost_p = calc_reaching_cost(rollout, pos_goal);
         cost_v = 0*calc_reaching_cost(v_rollout, cur_vel*0);
         

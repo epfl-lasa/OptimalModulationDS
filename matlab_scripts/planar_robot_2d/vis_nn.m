@@ -20,6 +20,7 @@ joint_state = q_init;
 
 %figure with robot
 fig_handle = figure('Name','Two-dimensional robot');
+set(fig_handle,'color','w');
 ax_h = axes(fig_handle,'View',[0 90]);
 axis equal
 hold on
@@ -45,6 +46,7 @@ axes_rob.YLim = [q_min(4), q_max(4)];
 
 %figure with controls
 fig_handle2 = uifigure('Name','Control Panel','Position',[2223 100 450 353]);
+set(fig_handle2,'color','w');
 c_panel = uipanel(fig_handle2,'Title','Control','FontSize',12,...
         'Position',[25 50 400 300],'Scrollable',1);
 joint_idx_names = ["Joint 1","Joint 2",'x','y'];

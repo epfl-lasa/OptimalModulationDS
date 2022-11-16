@@ -22,7 +22,7 @@ q_min = [-k1*pi, -k2*pi, -10,-10];
 q_max = [k1*pi, k2*pi, 10, 10];
 
 %% PROBLEM SET UP
-dt = 0.2; %[s]
+dt = 0.1; %[s]
 H = 10; % prediction horizon
 N_ITER = 150;
 u1_max = pi; u1_min = -u1_max;
@@ -34,13 +34,14 @@ x2_max = q_max(2); x2_min = q_min(2);
 
 u1 = SX.sym('u1'); u2 = SX.sym('u2');
 controls = [u1]; n_c = length(controls);
-A = [-1 0; 0 -1];
+A = [-5 0.2; 0.6 -1];
+%A = -eye(2);
 attr = [-0.8*pi; -0.5*pi];
 attr = [-1.25; -1.1];
-init_pos = [0.75; 0.4];
+init_pos = [1.75; 1.8];
 
-obs_pos = [10; 0];
-obs_r = 5;
+obs_pos = [9; 0];
+obs_r = 3;
 
 %rhs = A*(states - attr) + controls;
 rotm = @(ang)[cos(ang) sin(ang);
@@ -155,7 +156,6 @@ u_opt=[];
 % the main simulaton loop... it works as long as the error is greater
 % than 10^-6 and the number of mpc steps is less than its maximum
 % value.
-pause(1)
 main_loop = tic;
 while(mpciter < N_ITER && norm(x0-x_ref)>1e-1)
     args.p   = [x0;x_ref]; % set the values of the parameters vector
@@ -186,6 +186,7 @@ while(mpciter < N_ITER && norm(x0-x_ref)>1e-1)
     %plotting part
     if mpciter == 1
         prepare_plot_planar_jspace
+        pause(1)
     end
     online_plot_planar_jspace
     %pause(0.5)

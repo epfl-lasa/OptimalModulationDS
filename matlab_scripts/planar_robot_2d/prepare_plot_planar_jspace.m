@@ -1,6 +1,7 @@
 %% animation plot
 %robot
 f_anim = figure('Name','Animation','Position',[100 100 1200 500]);
+set(f_anim,'color','w');
 ax_anim = subplot(1,2,1);
 title('Planar robot')
 xlabel('x, m')

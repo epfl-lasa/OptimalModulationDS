@@ -27,7 +27,7 @@ load('../obstacles/net_bean.mat')
 [y_f, dy_f] = tanhNN(net);
 [val, grad] = getGradAnalytical(y_f, dy_f, x);
 %% plotting
-figure(2)
+figure(3)
 
 Z_mg = reshape(val,size(X_mg));
 contourf(X_mg,Y_mg,Z_mg,100,'LineStyle','none')
@@ -36,8 +36,8 @@ contour(X_mg,Y_mg,Z_mg,[0,0.001],'LineStyle','-','LineColor','k','LineWidth',2)
 axis equal
 U_grad = reshape(grad(1,:),size(X_mg));
 V_grad = reshape(grad(2,:),size(Y_mg));
-streamslice(X_mg,Y_mg, U_grad, V_grad);
-%streamslice(X_mg,Y_mg, -V_grad, U_grad);
+%streamslice(X_mg,Y_mg, U_grad, V_grad);
+streamslice(X_mg,Y_mg, -V_grad, U_grad);
 
 title('Obstacle repuslion field')
 % starty = -3:1:3;

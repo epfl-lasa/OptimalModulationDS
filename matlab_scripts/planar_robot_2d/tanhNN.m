@@ -1,4 +1,4 @@
-function [y_f, tmp] = tanhNN(net)
+function [y_f, dy_f] = tanhNN(net)
     w1 = double(net.Layers(2).Weights);
     b1 = double(net.Layers(2).Bias);
     w2 = double(net.Layers(4).Weights);
@@ -22,8 +22,9 @@ function [y_f, tmp] = tanhNN(net)
 
     %y_f is a forward prop for the layers above
     y_f = @(x)z5(x);
-    tmp = 0;
-%     dy_f = @(x) w4*diag(1-tanh(z3(x)).^2)*...
-%             w3*diag(1-tanh(z2(x)).^2)*...
-%             w2*diag(1-tanh(z1(x)).^2)*w1;
+    %tmp = 0;
+    dy_f = @(x) w5*diag(1-tanh(z4(x)).^2)*...
+                w4*diag(1-tanh(z3(x)).^2)*...
+                w3*diag(1-tanh(z2(x)).^2)*...
+                w2*diag(1-tanh(z1(x)).^2)*w1;
 end

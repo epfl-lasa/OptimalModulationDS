@@ -42,7 +42,7 @@ crc_h = plot(ax_anim, xc, yc, 'r-','LineWidth',1.5);
 
 %% Constants and Parameters
 N_ITER = 1000;
-H = 30;
+H = 50;
 D = 2;
 SIGMA = [1, 0.5, 0.1];
 N_POL = size(SIGMA,2);
