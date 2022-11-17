@@ -3,7 +3,7 @@ clear all
 close all force
 vecspace = @(v1,v2,k) v1+linspace(0,1,k)'.*(v2-v1);
 global all_state
-rng(1)
+%rng(1)
 %%
 dh_r = [0 3 3];
 d = dh_r*0;
@@ -46,7 +46,7 @@ link_num = numeric_fk_model(j_state,dh_r,d,alpha,base, y_pos, n_pts);
 update_r(h_rob, link_num)
 
 [xc, yc] = circle_pts(y_pos(1), y_pos(2), y_r);
-h_circ = plot(ax_r, xc, yc, 'r-','LineWidth',1.5);
+h_kcirc = plot(ax_r, xc, yc, 'r-','LineWidth',1.5);
 
 %% joint space plot
 fig_jspace = figure('Name','jspace','Position',[500 100 450 353]);
@@ -89,18 +89,22 @@ MU_C = (q_min' + rand(2, N_KER).*(q_max-q_min)')*0 + j_state;
 S_NOMINAL = 0.05 * max(q_max-q_min); 
 MU_S = S_NOMINAL*ones(1, N_KER);
 MU_A = rand(1,N_KER)*2-1;
-SIGMA_C  = 0.0;
+SIGMA_C  = 0.;
 SIGMA_S = 0.1;
 SIGMA_A = 0.1;
 
 %plotting handlers
 h_traj = cell(1, N_TRAJ);
-h_ker = cell(1, N_KER);
+h_ker = cell(1, N_KER_MAX);
+h_kcirc = cell(1, N_KER_MAX);
 for i = 1:1:N_TRAJ
     h_traj{i} = plot(ax_j, 100, 100, 'b-');
 end
+
+[xc, yc] = circle_pts(100, 100, 1);
 for i = 1:1:N_KER_MAX
     h_ker{i} = plot(ax_j, 100, 100, 'c.','MarkerSize',10);
+    h_kcirc{i} = plot(ax_j, xc, yc, 'c-','LineWidth',1.5);
 end
 h_j_pos = plot(ax_j, j_state(1), j_state(2), 'g*');
 
@@ -170,6 +174,9 @@ while norm(j_state-q_f)>1e-1
     for i = 1:1:N_KER
         h_ker{i}.XData = pol{midx}.x0(1, i);
         h_ker{i}.YData = pol{midx}.x0(2, i);
+        [xc, yc] = circle_pts(pol{midx}.x0(1, i), pol{midx}.x0(2, i), 3*pol{midx}.sigma(i));
+        h_kcirc{i}.XData = xc;
+        h_kcirc{i}.YData = yc;
     end
     
     %moving the robot
@@ -227,7 +234,7 @@ function [traj, cost, ker_use] = propagate_mod(pol, j_state, q_f, dt, N, dh_r, y
              0 l_tau];
         %D = eye(2);
         tau_v_n = norm(q_dot)*tau_v;
-        n_v_n = 0.05*norm(q_dot)*n_v;
+        n_v_n = 1*norm(q_dot)*n_v;
         u_cur = 0;
         for j = 1:1:n_ker
             ker_use(j, i) = pol.alpha(j)*rbf(q_cur,pol.x0(:,j),pol.sigma(j));
