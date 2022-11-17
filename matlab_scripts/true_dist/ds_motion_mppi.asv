@@ -3,7 +3,7 @@ clear all
 close all force
 vecspace = @(v1,v2,k) v1+linspace(0,1,k)'.*(v2-v1);
 global all_state
-%rng(2)
+%rng(3)
 %%
 dh_r = [0 3 3];
 d = dh_r*0;
@@ -24,7 +24,7 @@ state_max = [q_max, y_max, 10];
 n_pts = 20;
 link_sym = symbolic_fk_model(j_state_sym,dh_r,d,alpha,base, y_sym, p_sym);
 j_state = p_s;
-y_pos = [-3; 2.75; 0];
+y_pos = [-3; 3.75; 0];
 y_r = 1;
 link_num = numeric_fk_model(j_state,dh_r,d,alpha,base, y_pos, n_pts);
 all_state = [j_state; y_pos(1:2); y_r];
@@ -78,18 +78,20 @@ q_f = [1.9; -2.6];
 q_f = [0; -1];
 plot(ax_j, q_f(1), q_f(2), 'r*')
 N_STEPS = 30;
-dt = 0.2;
+dt = 0.1;
 N_TRAJ = 20;
 
 %kernel sampling parameters
-N_KER = 50;
+N_KER = 0;
+N_KER_MAX = 50; 
 
-MU_C = q_min' + rand(2, N_KER).*(q_max-q_min)';
-MU_G = 0.1*max(q_max-q_min)*ones(1, N_KER);
+MU_C = (q_min' + rand(2, N_KER).*(q_max-q_min)')*0 + j_state;
+S_NOMINAL = 0.5 / 3;%0.5 * max(q_max-q_min)/3; 
+MU_S = S_NOMINAL*ones(1, N_KER);
 MU_A = rand(1,N_KER)*2-1;
-SIGMA_C  = 0.2;
-SIGMA_G = 0.2;
-SIGMA_A = 0.3;
+SIGMA_C  = 0;
+SIGMA_S = 0;
+SIGMA_A = 0.2;
 
 %plotting handlers
 h_traj = cell(1, N_TRAJ);
@@ -97,7 +99,7 @@ h_ker = cell(1, N_KER);
 for i = 1:1:N_TRAJ
     h_traj{i} = plot(ax_j, 100, 100, 'b-');
 end
-for i = 1:1:N_KER
+for i = 1:1:N_KER_MAX
     h_ker{i} = plot(ax_j, 100, 100, 'c.','MarkerSize',10);
 end
 h_j_pos = plot(ax_j, j_state(1), j_state(2), 'g*');
@@ -105,14 +107,38 @@ h_j_pos = plot(ax_j, j_state(1), j_state(2), 'g*');
 %main loop
 MAIN_ITER = 1;
 while norm(j_state-q_f)>1e-1
+    ker_added = 0;
+    link_num = numeric_fk_model(j_state,dh_r,0*dh_r,0*dh_r,eye(4), y_pos, 10);
+    dst_coll = link_num{1}.mindist - y_r;
+    dst_mu = 100;
+    for i = 1:1:N_KER
+        dst_mu = min(dst_mu, norm(j_state-MU_C(:,i)));
+    end
+    msg = sprintf('')
+    %if we are close-to-collision and far from kernels, add kernel
+    if dst_coll < 1 && dst_mu > 2*S_NOMINAL 
+        ker_added = 1;
+        N_KER = N_KER + 1;
+        MU_C = [MU_C j_state];
+        MU_S = [MU_S S_NOMINAL];
+        MU_A = [MU_A 0];
+    end
+    %sample policies
     centers = normrnd(repmat(MU_C,[1,1,N_TRAJ]),SIGMA_C); %centers of rbfs
-    gammas = normrnd(repmat(MU_G,[N_TRAJ,1]),SIGMA_G); %width of rbfs
+    gammas = normrnd(repmat(MU_S,[N_TRAJ,1]),SIGMA_S); %width of rbfs
     alphas = normrnd(repmat(MU_A,[N_TRAJ,1]),SIGMA_A); %amplitude of rbfs
-    if MAIN_ITER == 1
-        centers = q_min' + rand(2, N_KER, N_TRAJ).*(q_max-q_min)'; 
-
+    if ker_added
+        alphas(:, end) = rand(N_KER,1)*2-1;
     end
 
+%     if MAIN_ITER == 1
+%         centers = q_min' + rand(2, N_KER, N_TRAJ).*(q_max-q_min)'; 
+%         gammas = 0.5*max(q_max-q_min)*rand(N_TRAJ, N_KER);
+%         alphas = rand(N_TRAJ,N_KER)*2-1;
+%     end
+%     if MAIN_ITER == 31
+%         tmp = 1
+%     end
     for i = 1:1:N_TRAJ
         pol{i}.x0 = squeeze(centers(:,:,i));
         pol{i}.gamma = gammas(i,:);
@@ -121,8 +147,9 @@ while norm(j_state-q_f)>1e-1
     %integration
     tic
     cost = zeros(1,N_TRAJ);
+    ker_use = zeros(N_TRAJ, N_KER);
     for i = 1:1:N_TRAJ
-        [traj_par{i}, cost(i)] = propagate_mod(pol{i},j_state, q_f, dt, N_STEPS, dh_r, y_pos, y_r, link_sym, q_min, q_max);
+        [traj_par{i}, cost(i), ker_use(i,:)] = propagate_mod(pol{i},j_state, q_f, dt, N_STEPS, dh_r, y_pos, y_r, link_sym, q_min, q_max);
         traj_par{i} = [j_state traj_par{i}];
     end
     toc
@@ -145,7 +172,11 @@ while norm(j_state-q_f)>1e-1
     end
     
     %moving the robot
-    j_state = traj_par{midx}(:,2);
+    x_dot = diff(traj_par{midx}(:,1:2),1,2);
+    if norm(x_dot)>1e-8
+        x_dot = x_dot/norm(x_dot);
+    end
+    j_state = j_state + 0.05*x_dot;
     h_j_pos.XData = j_state(1);
     h_j_pos.YData = j_state(2);
 
@@ -154,20 +185,28 @@ while norm(j_state-q_f)>1e-1
     drawnow
 
     %UPDATE POLICY
-    MU_C = centers(:,:,midx);
-    MAIN_ITER = MAIN_ITER+1;
-
+    k_act = sum(ker_use);
+    w_act = exp(1/mean(k_act) * k_act);
+    MU_UPD_RATE = 1-w_act/sum(w_act);
+    UPD_RATE = 0.2;
+    %MU_C = (1-UPD_RATE)*MU_C + UPD_RATE*centers(:,:,midx);
+    MU_C = (1-MU_UPD_RATE).*MU_C + MU_UPD_RATE.*centers(:,:,midx);
+    MU_A = (1-UPD_RATE)*MU_A + UPD_RATE*alphas(midx, :);
+    MU_S = (1-UPD_RATE)*MU_S + UPD_RATE*gammas(midx, :);
+    MAIN_ITER = MAIN_ITER+1
 end
 
 %% functions 
-function [traj, cost] = propagate_mod(pol, j_state, q_f, dt, N, dh_r, y_pos, y_r, link_sym, q_min, q_max)
-    rbf = @(x, x0, g)exp(-g*norm(x-x0));
+function [traj, cost, ker_use] = propagate_mod(pol, j_state, q_f, dt, N, dh_r, y_pos, y_r, link_sym, q_min, q_max)
+    rbf = @(x, x0, s)exp(-norm(x-x0)^2/(2*s^2));
     rotm = @(ang)[cos(ang) sin(ang);
              -sin(ang) cos(ang)];
     A = [-1 0; 0 -1];
     q_cur = j_state;
     traj = zeros(2, N);
     cost = 0;
+    n_ker = length(pol.gamma);
+    ker_use = zeros(n_ker, N);
     for i = 1:1:N
 %         if i == 26 %debug stopping
 %             i
@@ -187,14 +226,15 @@ function [traj, cost] = propagate_mod(pol, j_state, q_f, dt, N, dh_r, y_pos, y_r
              0 l_tau];
         %D = eye(2);
         tau_v_n = norm(q_dot)*tau_v;
+        n_v_n = 0.1*norm(q_dot)*n_v;
         u_cur = 0;
-        n_ker = length(pol.gamma);
         for j = 1:1:n_ker
-            u_cur = u_cur + (1-l_n)*pol.alpha(j)*rbf(q_cur,pol.x0(:,j),pol.gamma(j));
+            ker_use(j, i) = pol.alpha(j)*rbf(q_cur,pol.x0(:,j),pol.gamma(j));
+            u_cur = u_cur + ker_use(j, i);
         end
-        q_dot = E*D*E' * (q_dot + u_cur*tau_v_n');
+        q_dot = E*D*E' * (q_dot + u_cur*tau_v_n' + (1-l_n)*n_v_n');
         %q_dot = E*D*E' * alpha* q_dot +E*D*E' * 1-alpha v(i) E*D*E' * 1-alpha v(i);
-
+        %penalize for collision
         if dst < 0
             q_dot = q_dot*0;
             cost = cost+100;
@@ -205,9 +245,14 @@ function [traj, cost] = propagate_mod(pol, j_state, q_f, dt, N, dh_r, y_pos, y_r
         end
         q_cur = q_cur + q_dot * dt;
         q_cur = min(max(q_cur, q_min'), q_max');
+        %penalize joint_limits
+        if any(q_cur<=q_min') || any(q_cur>=q_max')
+            cost = cost+100;
+        end
         traj(:, i) = q_cur;
     end    
     cost = cost + norm(q_cur-q_f);
+    ker_use = sum(abs(ker_use),2)';
 end
 
 
