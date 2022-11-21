@@ -3,7 +3,7 @@ clear all
 close all force
 vecspace = @(v1,v2,k) v1+linspace(0,1,k)'.*(v2-v1);
 global all_state
-%rng(1)
+rng(1)
 %%
 dh_r = [0 3 3];
 d = dh_r*0;
@@ -86,11 +86,11 @@ N_KER = 0;
 N_KER_MAX = 50; 
 
 MU_C = (q_min' + rand(2, N_KER).*(q_max-q_min)')*0 + j_state;
-S_NOMINAL = 0.05 * max(q_max-q_min); 
+S_NOMINAL = 0.03 * max(q_max-q_min); 
 MU_S = S_NOMINAL*ones(1, N_KER);
 MU_A = rand(1,N_KER)*2-1;
 SIGMA_C  = 0.;
-SIGMA_S = 0.1;
+SIGMA_S = 0.;
 SIGMA_A = 0.1;
 
 %plotting handlers
@@ -121,7 +121,7 @@ while norm(j_state-q_f)>1e-1
     msg = sprintf('Collision dist: %4.2f, Kernel dist: %4.2f', dst_coll, dst_mu);
     disp(msg)
     %if we are close-to-collision and far from kernels, add kernel
-    if dst_coll < 2 && dst_mu > S_NOMINAL*2
+    if dst_coll < 2 && dst_mu > S_NOMINAL
         ker_added = 1
         N_KER = N_KER + 1;
         MU_C = [MU_C j_state];
@@ -244,7 +244,7 @@ function [traj, cost, ker_use] = propagate_mod(pol, j_state, q_f, dt, N, dh_r, y
         %q_dot = E*D*E' * alpha* q_dot +E*D*E' * 1-alpha v(i) E*D*E' * 1-alpha v(i);
         %penalize for collision
         if dst < 0
-            %q_dot = q_dot*0;
+            q_dot = q_dot*0.1;
             cost = cost+100;
         end
         %[i norm(q_dot)] %debug info
@@ -262,7 +262,7 @@ function [traj, cost, ker_use] = propagate_mod(pol, j_state, q_f, dt, N, dh_r, y
     %goal reaching cost
     cost = cost + norm(q_cur-q_f);
     %staying cost away from goal
-    cost = cost+ norm(q_cur-q_f)*1/sum(abs(mean(diff(traj,1,2),2)));
+    cost = cost + 10*norm(q_cur-q_f)*1/sum(abs(mean(diff(traj,1,2),2)));
     ker_use = sum(abs(ker_use),2)';
 end
 
