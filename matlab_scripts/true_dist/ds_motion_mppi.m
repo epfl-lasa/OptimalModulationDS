@@ -162,7 +162,7 @@ while norm(j_state-q_f)>1e-1
         %3) joint limits cost
         j_lim_cost = sum(any(traj{i}<q_min'))*100+sum(any(traj{i}>q_max'))*100;
         %4) trajectory length cost (not to stay or oscillate)
-        stay_cost = 100*goal_cost_tmp * norm(traj{i}(:,1)-traj{i}(:,end));
+        stay_cost = 100*goal_cost_tmp * 1/norm(traj{i}(:,1)-traj{i}(:,end));
         cost(i) = goal_cost_tmp+coll_cost_tmp+j_lim_cost+stay_cost;
     end
     beta = mean(cost)/30;
@@ -173,7 +173,9 @@ while norm(j_state-q_f)>1e-1
     ker_added = 0;
     %find all points close-to-collision and far from existing kernels
     potential_ker = zeros(0,2);
+    ker_use = zeros(N_TRAJ, N_KER);
     for i = 1:1:N_TRAJ
+        ker_use(i,:) = sum(ker_val{i},2)';
         %indices of trajectory points close-to-collision
         idx_close = (dist{i}>0) & (dist{i}<0.5);
         %indices of trajectory points away from existing kernels
@@ -228,15 +230,14 @@ while norm(j_state-q_f)>1e-1
     drawnow
 
     %UPDATE POLICY
-%     k_act = sum(ker_use);
-%     w_act = exp(1/mean(k_act) * k_act);
-%     MU_UPD_RATE = 1-w_act/sum(w_act);
-    UPD_RATE = 0.8;
-    MU_C = (1-UPD_RATE)*MU_C + UPD_RATE*centers(:,:,midx);
-%     MU_C = (1-MU_UPD_RATE).*MU_C + MU_UPD_RATE.*centers(:,:,midx);
-    MU_A = (1-UPD_RATE)*MU_A + UPD_RATE*alphas(midx, :);
-    MU_S = (1-UPD_RATE)*MU_S + UPD_RATE*sigmas(midx, :);
-    MAIN_ITER = MAIN_ITER+1;
+    k_act = sum(ker_use);
+    w_act = exp(1/mean(k_act) * k_act);
+    %UPD_RATE = w_act/sum(w_act);
+    UPD_RATE = 0.9;
+    MU_C = (1-UPD_RATE).*MU_C + UPD_RATE.*centers(:,:,midx);
+    MU_A = (1-UPD_RATE).*MU_A + UPD_RATE.*alphas(midx, :);
+    MU_S = (1-UPD_RATE).*MU_S + UPD_RATE.*sigmas(midx, :);
+    MAIN_ITER = MAIN_ITER+1
 end
 
 %% functions 

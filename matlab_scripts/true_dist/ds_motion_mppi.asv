@@ -24,7 +24,7 @@ state_max = [q_max, y_max, 10];
 n_pts = 20;
 link_sym = symbolic_fk_model(j_state_sym,dh_r,d,alpha,base, y_sym, p_sym);
 j_state = p_s;
-y_pos = [-3; 4.5; 0];
+y_pos = [-3; 3.5; 0];
 y_r = 1;
 link_num = numeric_fk_model(j_state,dh_r,d,alpha,base, y_pos, n_pts);
 all_state = [j_state; y_pos(1:2); y_r];
@@ -77,7 +77,7 @@ A = [-1 0; 0 -1];
 q_f = [1.9; -2.6];
 q_f = [0; -1];
 plot(ax_j, q_f(1), q_f(2), 'r*')
-N_STEPS = 50;
+N_STEPS = 30;
 dt = 0.2;
 N_TRAJ = 10;
 
@@ -86,11 +86,11 @@ N_KER = 0;
 N_KER_MAX = 50; 
 
 MU_C = (q_min' + rand(2, N_KER).*(q_max-q_min)')*0 + j_state;
-S_NOMINAL = 0.03 * max(q_max-q_min); 
+S_NOMINAL = 0.02 * max(q_max-q_min); 
 MU_S = S_NOMINAL*ones(1, N_KER);
 MU_A = rand(1,N_KER)*2-1;
-SIGMA_C  = 0.;
-SIGMA_S = 0.;
+SIGMA_C  = 0.0;
+SIGMA_S = 0.00;
 SIGMA_A = 0.1;
 
 %plotting handlers
@@ -103,7 +103,7 @@ end
 
 [xc, yc] = circle_pts(100, 100, 1);
 for i = 1:1:N_KER_MAX
-    h_ker{i} = plot(ax_j, 100, 100, 'c.','MarkerSize',10);
+    h_ker{i} = plot(ax_j, 100, 100, 'c.','MarkerSize',2);
     h_kcirc{i} = plot(ax_j, xc, yc, 'c-','LineWidth',1.5);
 end
 h_j_pos = plot(ax_j, j_state(1), j_state(2), 'g*');
@@ -134,7 +134,10 @@ while norm(j_state-q_f)>1e-1
     if ker_added
         alphas(:, end) = rand(N_TRAJ,1)*2-1;
     end
-
+    if N_KER>0
+        alphas(1, :) = 1;
+        alphas(2, :) = -1;
+    end
     for i = 1:1:N_TRAJ
         pol{i}.x0 = squeeze(centers(:,:,i));
         pol{i}.sigma = sigmas(i,:);
@@ -159,7 +162,7 @@ while norm(j_state-q_f)>1e-1
         %3) joint limits cost
         j_lim_cost = sum(any(traj{i}<q_min'))*100+sum(any(traj{i}>q_max'))*100;
         %4) trajectory length cost (not to stay or oscillate)
-        stay_cost = goal_cost_tmp * norm(traj{i}(:,1)-traj{i}(:,end));
+        stay_cost = 100*goal_cost_tmp * 1/norm(traj{i}(:,1)-traj{i}(:,end));
         cost(i) = goal_cost_tmp+coll_cost_tmp+j_lim_cost+stay_cost;
     end
     beta = mean(cost)/30;
@@ -170,14 +173,21 @@ while norm(j_state-q_f)>1e-1
     ker_added = 0;
     %find all points close-to-collision and far from existing kernels
     potential_ker = zeros(0,2);
+    ker_use = zeros(N_TRAJ, N_KER);
     for i = 1:1:N_TRAJ
+        ker_use(i,:) = sum(ker_val{i},2)';
         %indices of trajectory points close-to-collision
         idx_close = (dist{i}>0) & (dist{i}<0.5);
         %indices of trajectory points away from existing kernels
         idx_no_ker = zeros(size(idx_close));
-        idx_no_ker(all(abs(ker_val{i})<0.3)) = 1;
+%         idx_no_ker(all(abs(ker_val{i})<0.5,1)) = 1;
+        idx_no_ker(sum(abs(ker_val{i}),1)<0.2) = 1;
+
         %potential new kernel locations
         potential_ker = [potential_ker traj{i}(:, idx_close & idx_no_ker)];
+%         if sum(idx_close & idx_no_ker)>0
+%             i
+%         end
     end
     potential_ker = unique(potential_ker','rows')';
     if size(potential_ker,2)>0
@@ -199,6 +209,11 @@ while norm(j_state-q_f)>1e-1
         [xc, yc] = circle_pts(pol{midx}.x0(1, i), pol{midx}.x0(2, i), 3*pol{midx}.sigma(i));
         h_kcirc{i}.XData = xc;
         h_kcirc{i}.YData = yc;
+        if pol{midx}.alpha(i)>0
+            h_kcirc{i}.Color = [1 1 0];
+        else
+            h_kcirc{i}.Color = [0 1 1];
+        end
     end
     
     %moving the robot
@@ -206,7 +221,7 @@ while norm(j_state-q_f)>1e-1
     if norm(x_dot)>1e-8
         x_dot = x_dot/norm(x_dot);
     end
-    j_state = j_state + 0.05*x_dot;
+    j_state = j_state + 0.1*x_dot;
     h_j_pos.XData = j_state(1);
     h_j_pos.YData = j_state(2);
 
@@ -215,15 +230,14 @@ while norm(j_state-q_f)>1e-1
     drawnow
 
     %UPDATE POLICY
-%     k_act = sum(ker_use);
-%     w_act = exp(1/mean(k_act) * k_act);
-%     MU_UPD_RATE = 1-w_act/sum(w_act);
+    k_act = sum(ker_use);
+    w_act = exp(1/mean(k_act) * k_act);
+    %UPD_RATE = w_act/sum(w_act);
     UPD_RATE = 0.9;
-    MU_C = (1-UPD_RATE)*MU_C + UPD_RATE*centers(:,:,midx);
-%     MU_C = (1-MU_UPD_RATE).*MU_C + MU_UPD_RATE.*centers(:,:,midx);
-    MU_A = (1-UPD_RATE)*MU_A + UPD_RATE*alphas(midx, :);
-    MU_S = (1-UPD_RATE)*MU_S + UPD_RATE*sigmas(midx, :);
-    MAIN_ITER = MAIN_ITER+1;
+    MU_C = (1-UPD_RATE).*MU_C + UPD_RATE.*centers(:,:,midx);
+    MU_A = (1-UPD_RATE).*MU_A + UPD_RATE.*alphas(midx, :);
+    MU_S = (1-UPD_RATE).*MU_S + UPD_RATE.*sigmas(midx, :);
+    MAIN_ITER = MAIN_ITER+1
 end
 
 %% functions 
@@ -256,12 +270,12 @@ function [traj, dst_arr, ker_val] = propagate_mod(pol, j_state, q_f, dt, N, dh_r
         D = [l_n 0;
              0 l_tau];
         %D = eye(2);
-        tau_v_n = norm(q_dot)*tau_v;
+        tau_v_n = 1*norm(q_dot)*tau_v;
         n_v_n = 1*norm(q_dot)*n_v;
         u_cur = 0;
         for j = 1:1:n_ker
-            ker_val(j, i) = pol.alpha(j)*rbf(q_cur,pol.x0(:,j),pol.sigma(j));
-            u_cur = u_cur + ker_val(j, i);
+            ker_val(j, i) = rbf(q_cur,pol.x0(:,j),pol.sigma(j));
+            u_cur = u_cur + pol.alpha(j)*ker_val(j, i);
         end
         q_dot = E*D*E' * (q_dot + u_cur*tau_v_n' + (1-l_n)*n_v_n');
         %q_dot = E*D*E' * alpha* q_dot +E*D*E' * 1-alpha v(i) E*D*E' * 1-alpha v(i);
