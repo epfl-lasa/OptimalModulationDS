@@ -3,7 +3,7 @@ clear all
 close all force
 vecspace = @(v1,v2,k) v1+linspace(0,1,k)'.*(v2-v1);
 global all_state
-rng(1)
+%rng(1)
 %%
 dh_r = [0 3 3];
 d = dh_r*0;
@@ -24,7 +24,7 @@ state_max = [q_max, y_max, 10];
 n_pts = 20;
 link_sym = symbolic_fk_model(j_state_sym,dh_r,d,alpha,base, y_sym, p_sym);
 j_state = p_s;
-y_pos = [-3; 3.5; 0];
+y_pos = [-3; 5.5; 0];
 y_r = 1;
 link_num = numeric_fk_model(j_state,dh_r,d,alpha,base, y_pos, n_pts);
 all_state = [j_state; y_pos(1:2); y_r];
@@ -86,12 +86,12 @@ N_KER = 0;
 N_KER_MAX = 50; 
 
 MU_C = (q_min' + rand(2, N_KER).*(q_max-q_min)')*0 + j_state;
-S_NOMINAL = 0.02 * max(q_max-q_min); 
+S_NOMINAL = 0.01 * max(q_max-q_min); 
 MU_S = S_NOMINAL*ones(1, N_KER);
 MU_A = rand(1,N_KER)*2-1;
 SIGMA_C  = 0.0;
 SIGMA_S = 0.0;
-SIGMA_A = 0.1;
+SIGMA_A = 0.0;
 
 %plotting handlers
 h_traj = cell(1, N_TRAJ);
@@ -118,7 +118,8 @@ while norm(j_state-q_f)>1e-1
     for i = 1:1:N_KER
         dst_mu = min(dst_mu, norm(j_state-MU_C(:,i)));
     end
-    msg = sprintf('Collision dist: %4.2f, Kernel dist: %4.2f', dst_coll, dst_mu);
+    msg = sprintf('Iter: %d, Collision dist: %4.2f, Kernel dist: %4.2f', ...
+        MAIN_ITER, dst_coll, dst_mu);
     disp(msg)
     %if we add kernel based on previous rollouts
     if ker_added
@@ -165,9 +166,6 @@ while norm(j_state-q_f)>1e-1
         stay_cost = 100*goal_cost_tmp * 1/norm(traj{i}(:,1)-traj{i}(:,end));
         cost(i) = goal_cost_tmp+coll_cost_tmp+j_lim_cost+stay_cost;
     end
-    beta = mean(cost)/30;
-    w = exp(-1/beta * cost);
-    w = w/sum(w);
     
     %add new kernels
     ker_added = 0;
@@ -181,7 +179,7 @@ while norm(j_state-q_f)>1e-1
         %indices of trajectory points away from existing kernels
         idx_no_ker = zeros(size(idx_close));
 %         idx_no_ker(all(abs(ker_val{i})<0.5,1)) = 1;
-        idx_no_ker(sum(abs(ker_val{i}),1)<0.2) = 1;
+        idx_no_ker(sum(abs(ker_val{i}),1)<0.1) = 1;
 
         %potential new kernel locations
         potential_ker = [potential_ker traj{i}(:, idx_close & idx_no_ker)];
@@ -225,19 +223,24 @@ while norm(j_state-q_f)>1e-1
     h_j_pos.XData = j_state(1);
     h_j_pos.YData = j_state(2);
 
-    link_num = numeric_fk_model(j_state,dh_r,0*dh_r,0*dh_r,eye(4), y_pos, 10);
+    link_num = numeric_fk_model(j_state,dh_r,0*dh_r,0*dh_r,eye(4), y_pos, 5);
     update_r(h_rob, link_num)
     drawnow
 
     %UPDATE POLICY
+    beta = mean(cost)/50;
+    w = exp(-1/beta * cost);
+    w = w/sum(w);
+
     k_act = sum(ker_use);
     w_act = exp(1/mean(k_act) * k_act);
     %UPD_RATE = w_act/sum(w_act);
-    UPD_RATE = 0.9;
-    MU_C = (1-UPD_RATE).*MU_C + UPD_RATE.*centers(:,:,midx);
-    MU_A = (1-UPD_RATE).*MU_A + UPD_RATE.*alphas(midx, :);
-    MU_S = (1-UPD_RATE).*MU_S + UPD_RATE.*sigmas(midx, :);
-    MAIN_ITER = MAIN_ITER+1
+    UPD_RATE = 0.8;
+    w_e(1,1,:) = w;
+    MU_C = (1-UPD_RATE).*MU_C + UPD_RATE.*sum(w_e .* centers,3);
+    MU_A = (1-UPD_RATE).*MU_A + UPD_RATE.*sum(w'.*alphas);
+    MU_S = (1-UPD_RATE).*MU_S + UPD_RATE.*sum(w'.*sigmas);
+    MAIN_ITER = MAIN_ITER+1;
 end
 
 %% functions 
@@ -277,7 +280,7 @@ function [traj, dst_arr, ker_val] = propagate_mod(pol, j_state, q_f, dt, N, dh_r
             ker_val(j, i) = rbf(q_cur,pol.x0(:,j),pol.sigma(j));
             u_cur = u_cur + pol.alpha(j)*ker_val(j, i);
         end
-        q_dot = E*D*E' * (q_dot + u_cur*tau_v_n' + (1-l_n)*n_v_n');
+        q_dot = E*D*E' * (q_dot + u_cur*tau_v_n' + 0*(1-l_n)*n_v_n');
         %q_dot = E*D*E' * alpha* q_dot +E*D*E' * 1-alpha v(i) E*D*E' * 1-alpha v(i);
         %slow for collision
         if dst < 0
