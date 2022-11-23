@@ -24,7 +24,7 @@ state_max = [q_max, y_max, 10];
 n_pts = 20;
 link_sym = symbolic_fk_model(j_state_sym,dh_r,d,alpha,base, y_sym, p_sym);
 j_state = p_s;
-y_pos = [-3; 5.5; 0];
+y_pos = [-3; 3.5; 0];
 y_r = 1;
 link_num = numeric_fk_model(j_state,dh_r,d,alpha,base, y_pos, n_pts);
 all_state = [j_state; y_pos(1:2); y_r];
@@ -86,12 +86,12 @@ N_KER = 0;
 N_KER_MAX = 50; 
 
 MU_C = (q_min' + rand(2, N_KER).*(q_max-q_min)')*0 + j_state;
-S_NOMINAL = 0.01 * max(q_max-q_min); 
+S_NOMINAL = 0.02 * max(q_max-q_min); 
 MU_S = S_NOMINAL*ones(1, N_KER);
 MU_A = rand(1,N_KER)*2-1;
-SIGMA_C  = 0.0;
-SIGMA_S = 0.0;
-SIGMA_A = 0.0;
+SIGMA_C  = 0.00;
+SIGMA_S = 0.00;
+SIGMA_A = 0.1;
 
 %plotting handlers
 h_traj = cell(1, N_TRAJ);
@@ -112,6 +112,7 @@ h_j_pos = plot(ax_j, j_state(1), j_state(2), 'g*');
 MAIN_ITER = 1;
 ker_added = 0;
 while norm(j_state-q_f)>1e-1
+    tic
     link_num = numeric_fk_model(j_state,dh_r,0*dh_r,0*dh_r,eye(4), y_pos, 10);
     dst_coll = link_num{1}.mindist - y_r;
     dst_mu = 100;
@@ -124,6 +125,10 @@ while norm(j_state-q_f)>1e-1
     %if we add kernel based on previous rollouts
     if ker_added
         N_KER = N_KER + 1;
+        [~, closest_ker_idx] = min(vecnorm(MU_C - new_ker));
+        if closest_ker_idx
+            alphas(:, end) = alphas(:,closest_ker_idx);
+        end
         MU_C = [MU_C new_ker];
         MU_S = [MU_S S_NOMINAL];
         MU_A = [MU_A 0];
@@ -132,9 +137,9 @@ while norm(j_state-q_f)>1e-1
     centers = normrnd(repmat(MU_C,[1,1,N_TRAJ]),SIGMA_C); %centers of rbfs
     sigmas = normrnd(repmat(MU_S,[N_TRAJ,1]),SIGMA_S); %width of rbfs
     alphas = normrnd(repmat(MU_A,[N_TRAJ,1]),SIGMA_A); %amplitude of rbfs
-    if ker_added
-        alphas(:, end) = rand(N_TRAJ,1)*2-1;
-    end
+%     if ker_added
+%         alphas(:, end) = rand(N_TRAJ,1)*2-1;
+%     end
     if N_KER>0
         alphas(1, :) = 1;
         alphas(2, :) = -1;
@@ -201,19 +206,20 @@ while norm(j_state-q_f)>1e-1
     end
     
     [mval, midx] = min(cost);
-    for i = 1:1:N_KER
-        h_ker{i}.XData = pol{midx}.x0(1, i);
-        h_ker{i}.YData = pol{midx}.x0(2, i);
-        [xc, yc] = circle_pts(pol{midx}.x0(1, i), pol{midx}.x0(2, i), 3*pol{midx}.sigma(i));
-        h_kcirc{i}.XData = xc;
-        h_kcirc{i}.YData = yc;
-        if pol{midx}.alpha(i)>0
-            h_kcirc{i}.Color = [1 1 0];
-        else
-            h_kcirc{i}.Color = [0 1 1];
+    if var(cost)>0.1*mean(cost)
+        for i = 1:1:N_KER
+            h_ker{i}.XData = pol{midx}.x0(1, i);
+            h_ker{i}.YData = pol{midx}.x0(2, i);
+            [xc, yc] = circle_pts(pol{midx}.x0(1, i), pol{midx}.x0(2, i), 3*pol{midx}.sigma(i));
+            h_kcirc{i}.XData = xc;
+            h_kcirc{i}.YData = yc;
+            if pol{midx}.alpha(i)>0
+                h_kcirc{i}.Color = [1 1 0];
+            else
+                h_kcirc{i}.Color = [0 1 1];
+            end
         end
     end
-    
     %moving the robot
     x_dot = diff(traj{midx}(:,1:2),1,2);
     if norm(x_dot)>1e-8
@@ -235,12 +241,15 @@ while norm(j_state-q_f)>1e-1
     k_act = sum(ker_use);
     w_act = exp(1/mean(k_act) * k_act);
     %UPD_RATE = w_act/sum(w_act);
-    UPD_RATE = 0.8;
+    UPD_RATE = 0.6;
+    UPD_RATE = 0.6*ones(1,N_KER);
+    UPD_RATE(k_act<0.1) = 0;
     w_e(1,1,:) = w;
     MU_C = (1-UPD_RATE).*MU_C + UPD_RATE.*sum(w_e .* centers,3);
     MU_A = (1-UPD_RATE).*MU_A + UPD_RATE.*sum(w'.*alphas);
     MU_S = (1-UPD_RATE).*MU_S + UPD_RATE.*sum(w'.*sigmas);
     MAIN_ITER = MAIN_ITER+1;
+    toc
 end
 
 %% functions 
@@ -278,9 +287,9 @@ function [traj, dst_arr, ker_val] = propagate_mod(pol, j_state, q_f, dt, N, dh_r
         u_cur = 0;
         for j = 1:1:n_ker
             ker_val(j, i) = rbf(q_cur,pol.x0(:,j),pol.sigma(j));
-            u_cur = u_cur + pol.alpha(j)*ker_val(j, i);
+            u_cur = u_cur + pol.alpha(j)/norm(pol.alpha(j))*ker_val(j, i);
         end
-        q_dot = E*D*E' * (q_dot + u_cur*tau_v_n' + 0*(1-l_n)*n_v_n');
+        q_dot = E*D*E' * (q_dot + u_cur*tau_v_n' + (1-l_n)*n_v_n');
         %q_dot = E*D*E' * alpha* q_dot +E*D*E' * 1-alpha v(i) E*D*E' * 1-alpha v(i);
         %slow for collision
         if dst < 0
