@@ -5,17 +5,18 @@ vecspace = @(v1,v2,k) v1+linspace(0,1,k)'.*(v2-v1);
 global all_state
 %rng(1)
 %%
-dh_r = [0 3 3];
+dh_r = [0 2 2 2];
 d = dh_r*0;
 alpha = dh_r*0;
 base = eye(4);
-syms j_state_sym [length(dh_r)-1 1]
+DOFs = length(dh_r)-1;
+syms j_state_sym [DOFs 1]
 syms y_sym [3, 1] %planar => z=0
 syms p_sym [3, 1]
-p_s = [pi; 0.3];
-p_f = [1; -1.7];
-q_min = [-pi, -pi];
-q_max = [pi, pi];
+p_s = [pi; 0.3; 0];
+p_f = [0; -1; 0];
+q_min = -pi*ones(1, DOFs);
+q_max = pi*ones(1, DOFs);
 y_min = [-10, -10];
 y_max = [10, 10];
 state_min = [q_min, y_min, 0.01];
@@ -37,6 +38,9 @@ hold on
 ax_r.XLim = [y_min(1) y_max(1)];
 ax_r.YLim = [y_min(2) y_max(2)];
 ax_r.ZLim = [-0.1 0.1];
+xlabel('x')
+ylabel('y')
+
 %plot(ax_h, link_num{1}.pos(:,1), link_num{1}.pos(:,2), 'r*')
 ctr_r = 0;
 h_rob = create_r(ax_r, link_num);
@@ -61,7 +65,11 @@ n_grid = 30;
 x_span = linspace(-pi, pi, n_grid);
 y_span = linspace(-pi, pi, n_grid);
 [X_mg,Y_mg] = meshgrid(x_span, y_span);
-q=[X_mg(:) Y_mg(:)];
+q = zeros(length(X_mg(:)), DOFs);
+q(:,1)=X_mg(:);
+q(:,2)=Y_mg(:);
+xlabel('q1')
+ylabel('q2')
 %tic
 [dst, rep] = getClosestDistanceVec(q, y_pos, link_sym, dh_r, d, alpha, base, n_pts);
 dst = dst - y_r;
@@ -74,9 +82,7 @@ Z_mg = reshape(dst,size(X_mg));
 rotm = @(ang)[cos(ang) sin(ang);
              -sin(ang) cos(ang)];
 A = [-1 0; 0 -1];
-q_f = [1.9; -2.6];
-q_f = [0; -1];
-plot(ax_j, q_f(1), q_f(2), 'r*')
+plot(ax_j, p_f(1), p_f(2), 'r*')
 N_STEPS = 30;
 dt = 0.2;
 N_TRAJ = 10;
@@ -85,10 +91,10 @@ N_TRAJ = 10;
 N_KER = 0;
 N_KER_MAX = 50; 
 
-MU_C = (q_min' + rand(2, N_KER).*(q_max-q_min)')*0 + j_state;
+MU_C = zeros(DOFs, N_KER);
 S_NOMINAL = 0.02 * max(q_max-q_min); 
 MU_S = S_NOMINAL*ones(1, N_KER);
-MU_A = rand(1,N_KER)*2-1;
+MU_A = zeros(DOFs-1,N_KER); %alphas for tangential space
 SIGMA_C  = 0.00;
 SIGMA_S = 0.00;
 SIGMA_A = 0.1;
@@ -111,7 +117,7 @@ h_j_pos = plot(ax_j, j_state(1), j_state(2), 'g*');
 %main loop
 MAIN_ITER = 1;
 ker_added = 0;
-while norm(j_state-q_f)>1e-1
+while norm(j_state-p_f)>1e-1
     tic
     link_num = numeric_fk_model(j_state,dh_r,0*dh_r,0*dh_r,eye(4), y_pos, 10);
     dst_coll = link_num{1}.mindist - y_r;
@@ -128,32 +134,33 @@ while norm(j_state-q_f)>1e-1
         N_KER = N_KER + 1;
         MU_C = [MU_C new_ker];
         MU_S = [MU_S S_NOMINAL];
-        MU_A = [MU_A 0];
-        if closest_ker_idx
+        MU_A = [MU_A zeros(DOFs-1,1)];
+        if N_KER>1
             MU_A(end) = MU_A(closest_ker_idx);
         end
     end
     %sample policies
     centers = normrnd(repmat(MU_C,[1,1,N_TRAJ]),SIGMA_C); %centers of rbfs
     sigmas = normrnd(repmat(MU_S,[N_TRAJ,1]),SIGMA_S); %width of rbfs
-    alphas = normrnd(repmat(MU_A,[N_TRAJ,1]),SIGMA_A); %amplitude of rbfs
-%     if ker_added
-%         alphas(:, end) = rand(N_TRAJ,1)*2-1;
-%     end
-    if N_KER>0
-        alphas(1, :) = 1;
-        alphas(2, :) = -1;
+    alphas = normrnd(repmat(MU_A,[1,1,N_TRAJ]),SIGMA_A); %amplitude of rbfs
+
+    if N_KER>0      
+        alphas(:, :, 1) = alphas(:, :, 1)*0+[1; 0];
+        alphas(:, :, 2) = alphas(:, :, 1)*0+[-1; 0];
+        alphas(:, :, 3) = alphas(:, :, 1)*0+[0; 1];
+        alphas(:, :, 4) = alphas(:, :, 1)*0+[0; -1];
     end
+    
     for i = 1:1:N_TRAJ
         pol{i}.x0 = squeeze(centers(:,:,i));
         pol{i}.sigma = sigmas(i,:);
-        pol{i}.alpha = alphas(i,:);
+        pol{i}.alpha = squeeze(alphas(:,:,i));
     end
     %integration
     %tic
     %ker_use = zeros(N_TRAJ, N_KER);
     for i = 1:1:N_TRAJ
-        [traj{i}, dist{i}, ker_val{i}] = propagate_mod(pol{i},j_state, q_f, dt, N_STEPS, dh_r, y_pos, y_r, link_sym, q_min, q_max);
+        [traj{i}, dist{i}, ker_val{i}] = propagate_mod(pol{i},j_state, p_f, dt, N_STEPS, dh_r, y_pos, y_r, link_sym, q_min, q_max);
         traj{i} = [j_state traj{i}];
     end
     %toc
@@ -162,7 +169,7 @@ while norm(j_state-q_f)>1e-1
     cost = zeros(1, N_TRAJ);
     for i = 1:1:N_TRAJ
         %1) reaching goal cost
-        goal_cost_tmp = norm(traj{i}(:,end)-q_f); 
+        goal_cost_tmp = norm(traj{i}(:,end)-p_f); 
         %2) collision cost
         coll_cost_tmp = sum(dist{i}<0)*100;
         %3) joint limits cost
@@ -206,7 +213,7 @@ while norm(j_state-q_f)>1e-1
     end
     
     [mval, midx] = min(cost);
-    if var(cost)>0.1*mean(cost)
+    if var(cost)>0.1
         for i = 1:1:N_KER
             h_ker{i}.XData = pol{midx}.x0(1, i);
             h_ker{i}.YData = pol{midx}.x0(2, i);
@@ -246,7 +253,7 @@ while norm(j_state-q_f)>1e-1
     UPD_RATE(k_act<0.1) = 0;
     w_e(1,1,:) = w;
     MU_C = (1-UPD_RATE).*MU_C + UPD_RATE.*sum(w_e .* centers,3);
-    MU_A = (1-UPD_RATE).*MU_A + UPD_RATE.*sum(w'.*alphas);
+    MU_A = (1-UPD_RATE).*MU_A + UPD_RATE.*sum(w_e .* alphas, 3);
     MU_S = (1-UPD_RATE).*MU_S + UPD_RATE.*sum(w'.*sigmas);
     MAIN_ITER = MAIN_ITER+1;
     toc
@@ -257,9 +264,9 @@ function [traj, dst_arr, ker_val] = propagate_mod(pol, j_state, q_f, dt, N, dh_r
     rbf = @(x, x0, s)exp(-norm(x-x0)^2/(2*s^2));
     rotm = @(ang)[cos(ang) sin(ang);
              -sin(ang) cos(ang)];
-    A = [-1 0; 0 -1];
+    A = -1*eye(length(j_state));
     q_cur = j_state;
-    traj = zeros(2, N);
+    traj = zeros(length(j_state), N);
     n_ker = length(pol.sigma);
     ker_val = zeros(n_ker, N);
     dst_arr  = 100+zeros(1,N);
@@ -274,22 +281,23 @@ function [traj, dst_arr, ker_val] = propagate_mod(pol, j_state, q_f, dt, N, dh_r
         dst = dst - y_r - 0.;
         dst_arr(i) = dst;
         % modulation
-        tau_v = [n_v(2), -n_v(1)];
+        %tau_v = [n_v(2), -n_v(1)];
+        B = eye(length(n_v));
+        B(:,1) = n_v';
+        E = gs_m(B);
         g = max(1e-8, dst+1);
         l_n = max(0, 1 - 1/g);
         l_tau = max(1, 1 + 1/g);
-        E = [n_v' tau_v'];
-        D = [l_n 0;
-             0 l_tau];
+        %E = [n_v' tau_v'];
+        D = l_tau*eye(length(n_v));
+        D(1,1) = l_n;
         %D = eye(2);
-        tau_v_n = 1*norm(q_dot)*tau_v;
-        n_v_n = 1*norm(q_dot)*n_v;
         u_cur = 0;
         for j = 1:1:n_ker
             ker_val(j, i) = rbf(q_cur,pol.x0(:,j),pol.sigma(j));
-            u_cur = u_cur + pol.alpha(j)/norm(pol.alpha(j))*ker_val(j, i);
+            u_cur = u_cur + pol.alpha(:,j)/norm(pol.alpha(:,j))*ker_val(j, i);
         end
-        q_dot = E*D*E' * (q_dot + u_cur*tau_v_n' + (1-l_n)*n_v_n');
+        q_dot = E*D*E' * (q_dot + sum(u_cur'.*E(:,2:end),2) + (1-l_n)*E(:,1));
         %q_dot = E*D*E' * alpha* q_dot +E*D*E' * 1-alpha v(i) E*D*E' * 1-alpha v(i);
         %slow for collision
         if dst < 0

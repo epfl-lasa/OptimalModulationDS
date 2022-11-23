@@ -124,14 +124,14 @@ while norm(j_state-q_f)>1e-1
     disp(msg)
     %if we add kernel based on previous rollouts
     if ker_added
-        N_KER = N_KER + 1;
         [~, closest_ker_idx] = min(vecnorm(MU_C - new_ker));
-        if closest_ker_idx
-            alphas(:, end) = alphas(:,closest_ker_idx);
-        end
+        N_KER = N_KER + 1;
         MU_C = [MU_C new_ker];
         MU_S = [MU_S S_NOMINAL];
         MU_A = [MU_A 0];
+        if closest_ker_idx
+            MU_A(end) = MU_A(closest_ker_idx);
+        end
     end
     %sample policies
     centers = normrnd(repmat(MU_C,[1,1,N_TRAJ]),SIGMA_C); %centers of rbfs
