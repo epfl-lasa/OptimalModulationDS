@@ -5,7 +5,7 @@ vecspace = @(v1,v2,k) v1+linspace(0,1,k)'.*(v2-v1);
 global all_state
 %rng(1)
 %%
-dh_r = [0 2 2 2];
+dh_r = [0 1 1 1 1 1 1 1];
 d = dh_r*0;
 alpha = dh_r*0;
 base = eye(4);
@@ -13,8 +13,10 @@ DOFs = length(dh_r)-1;
 syms j_state_sym [DOFs 1]
 syms y_sym [3, 1] %planar => z=0
 syms p_sym [3, 1]
-p_s = [pi; 0.3; 0];
-p_f = [0; -1; 0];
+p_s = zeros(DOFs,1);
+p_s(1) = pi/2;
+p_f = zeros(DOFs,1);
+p_f(1) = -pi/2;
 q_min = -pi*ones(1, DOFs);
 q_max = pi*ones(1, DOFs);
 y_min = [-10, -10];
@@ -25,7 +27,7 @@ state_max = [q_max, y_max, 10];
 n_pts = 20;
 link_sym = symbolic_fk_model(j_state_sym,dh_r,d,alpha,base, y_sym, p_sym);
 j_state = p_s;
-y_pos = [-3; 3.5; 0];
+y_pos = [5; 0; 0];
 y_r = 1;
 link_num = numeric_fk_model(j_state,dh_r,d,alpha,base, y_pos, n_pts);
 all_state = [j_state; y_pos(1:2); y_r];
@@ -79,9 +81,6 @@ Z_mg = reshape(dst,size(X_mg));
 %toc
 
 %% motion
-rotm = @(ang)[cos(ang) sin(ang);
-             -sin(ang) cos(ang)];
-A = [-1 0; 0 -1];
 plot(ax_j, p_f(1), p_f(2), 'r*')
 N_STEPS = 30;
 dt = 0.2;
