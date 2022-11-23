@@ -144,11 +144,15 @@ while norm(j_state-p_f)>1e-1
     sigmas = normrnd(repmat(MU_S,[N_TRAJ,1]),SIGMA_S); %width of rbfs
     alphas = normrnd(repmat(MU_A,[1,1,N_TRAJ]),SIGMA_A); %amplitude of rbfs
 
-    if N_KER>0      
-        alphas(:, :, 1) = alphas(:, :, 1)*0+[1; 0];
-        alphas(:, :, 2) = alphas(:, :, 1)*0+[-1; 0];
-        alphas(:, :, 3) = alphas(:, :, 1)*0+[0; 1];
-        alphas(:, :, 4) = alphas(:, :, 1)*0+[0; -1];
+    %add seed directions
+    if N_KER>0
+        tmpl = eye(DOFs-1);
+        for i = 1:1:DOFs-1
+            %first positive tangent in the beginning
+            alphas(:, :, i)     = alphas(:, :, 1)*0+tmpl(i,:)';
+            %then negative tangent in the end
+            alphas(:, :, end-i+1) = alphas(:, :, 1)*0-tmpl(i,:)';
+        end
     end
     
     for i = 1:1:N_TRAJ
