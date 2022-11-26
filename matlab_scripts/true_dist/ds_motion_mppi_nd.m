@@ -5,7 +5,7 @@ vecspace = @(v1,v2,k) v1+linspace(0,1,k)'.*(v2-v1);
 global all_state
 %rng(1)
 %%
-dh_r = [0 1 1 1 1 1 1 1];
+dh_r = [0 3 3 ];
 d = dh_r*0;
 alpha = dh_r*0;
 base = eye(4);
@@ -82,9 +82,9 @@ Z_mg = reshape(dst,size(X_mg));
 
 %% motion
 plot(ax_j, p_f(1), p_f(2), 'r*')
-N_STEPS = 30;
+N_STEPS = 50;
 dt = 0.2;
-N_TRAJ = 10;
+N_TRAJ = 20;
 
 %kernel sampling parameters
 N_KER = 0;
@@ -94,8 +94,8 @@ MU_C = zeros(DOFs, N_KER);
 S_NOMINAL = 0.02 * max(q_max-q_min); 
 MU_S = S_NOMINAL*ones(1, N_KER);
 MU_A = zeros(DOFs-1,N_KER); %alphas for tangential space
-SIGMA_C  = 0.00;
-SIGMA_S = 0.00;
+SIGMA_C  = 0.0;
+SIGMA_S = 0.0;
 SIGMA_A = 0.1;
 
 %plotting handlers
@@ -301,6 +301,7 @@ function [traj, dst_arr, ker_val] = propagate_mod(pol, j_state, q_f, dt, N, dh_r
             u_cur = u_cur + pol.alpha(:,j)/norm(pol.alpha(:,j))*ker_val(j, i);
         end
         q_dot = E*D*E' * (q_dot + sum(u_cur'.*E(:,2:end),2) + (1-l_n)*E(:,1));
+
         %q_dot = E*D*E' * alpha* q_dot +E*D*E' * 1-alpha v(i) E*D*E' * 1-alpha v(i);
         %slow for collision
         if dst < 0

@@ -5,7 +5,7 @@ vecspace = @(v1,v2,k) v1+linspace(0,1,k)'.*(v2-v1);
 global all_state
 %rng(1)
 %%
-dh_r = [0 1 1 1 1 1];
+dh_r = [0 3 3];
 d = dh_r*0;
 alpha = dh_r*0;
 base = eye(4);
@@ -95,7 +95,7 @@ S_NOMINAL = 0.02 * max(q_max-q_min);
 MU_S = S_NOMINAL*ones(1, N_KER);
 MU_A = zeros(DOFs-1,N_KER); %alphas for tangential space
 SIGMA_C  = 0.00;
-SIGMA_S = 0.00;
+SIGMA_S = 0.01;
 SIGMA_A = 0.1;
 
 %plotting handlers

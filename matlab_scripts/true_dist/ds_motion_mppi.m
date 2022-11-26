@@ -12,8 +12,8 @@ base = eye(4);
 syms j_state_sym [length(dh_r)-1 1]
 syms y_sym [3, 1] %planar => z=0
 syms p_sym [3, 1]
-p_s = [pi; 0.3];
-p_f = [1; -1.7];
+p_s = [pi; 0.3;];
+p_f = [1; -1.7;];
 q_min = [-pi, -pi];
 q_max = [pi, pi];
 y_min = [-10, -10];
@@ -390,7 +390,7 @@ function [dist, rep] = getClosestDistanceVec(j_state, y_pos, link_sym, r,d,alpha
 end
 
 function link = numeric_fk_model(j_state,r,d,alpha,base,y, N_pts)
-    DOF = length(r)-1;
+    DOF = length(j_state);
     vecspace = @(v1,v2,k) v1+linspace(0,1,max(2,k))'.*(v2-v1);
     P = dh_fk(j_state,r,d,alpha,base);
     dist = @(x,y) sqrt((x-y)'*(x-y));
