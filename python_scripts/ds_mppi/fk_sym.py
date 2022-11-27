@@ -76,27 +76,29 @@ def symbolic_fk_model(q, dh_params):
         all_links.append(link_dict)
     return all_links
 
+def main():
+    q = np.array([0, 0, 0])
+    dh_a = np.array([0, 3, 3, 3])
+    dh_alpha = dh_a * 0
+    dh_d = dh_a * 0
+    dh_theta = dh_a * 0
+    dh_params = np.vstack((dh_d, dh_theta, dh_a, dh_alpha)).T
+    robot = numeric_fk_model(q, dh_params, 10)
+    y = np.array([10, 1, 0])
+    dst = dist_to_point(robot, y)
+    robot_sym = symbolic_fk_model(q, dh_params)
+    l1 = robot_sym[1]
 
-q = np.array([0, 0])
-dh_a = np.array([0, 3, 3])
-dh_alpha = dh_a*0
-dh_d = dh_a*0
-dh_theta = dh_a*0
-dh_params = np.vstack((dh_d, dh_theta, dh_a, dh_alpha)).T
-robot = numeric_fk_model(q, dh_params, 10)
-y = np.array([10, 0, 0])
-dst = dist_to_point(robot, y)
-robot_sym = symbolic_fk_model(q, dh_params)
-l1 = robot_sym[1]
+    p = robot['pts_int'][dst['linkidx']][dst['ptidx']]
+    print(l1['pos'](q, p))
+    print(l1['dist'](q, p, y))
+    print(l1['rep'](q, p, y))
 
-p = robot['pts_int'][dst['linkidx']][dst['ptidx']]
-print(l1['pos'](q, p))
-print(l1['dist'](q, p, y))
-print(l1['rep'](q, p, y))
+    print('fin')
 
-print('fin')
-#working symbolic position evaluation
-#TODO: symbolic gradient evaluation
+
+if __name__ == '__main__':
+    main()
 
 
 
