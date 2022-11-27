@@ -43,20 +43,37 @@ def symbolic_fk_model(q, dh_params):
     """
     # Compute the transformation matrices
     n_dof = len(q)
-    #q_sym = sp.symbols('q0:{}'.format(n_dof))
-    q_sym = sp.MatrixSymbol('q', n_dof, 1)
-    p_sym = sp.MatrixSymbol('p', 3, 1)
+    q_sym = sp.Matrix(sp.MatrixSymbol('q', n_dof, 1))
+    p_sym = sp.Matrix(sp.MatrixSymbol('p', 3, 1))
+    y_sym = sp.Matrix(sp.MatrixSymbol('y', 3, 1))
     P_arr = dh_fk_sym(q_sym, dh_params)
     all_links = []
     a = dh_params[:, 2]
     # Initialize the points array
     # Loop through each joint
     for i in range(n_dof):
+        link_dict = dict()
         R = P_arr[i+1][:3, :3]
         T = P_arr[i+1][:3, 3]
-        # Compute the position of the point for this link
+        # Compute the position of the point on this link
         pos = R @ p_sym + T
-        all_links.append(pos)
+        #distance for point on link to task space point
+        dist = sp.sqrt(((pos - y_sym).T * (pos - y_sym))[0])
+        #task space gradient
+        ddist = 1/dist * (pos - y_sym)
+        #jacobian
+        J = pos.jacobian(q_sym)
+        #repulsion
+        rep = (ddist.T * J)
+        pos_f = sp.lambdify(['q', 'p'], pos, 'numpy')
+        dst_f = sp.lambdify(['q', 'p', 'y'], dist, 'numpy')
+        rep_f = sp.lambdify(['q', 'p', 'y'], rep, 'numpy')
+
+        link_dict['pos'] = lambda q, p: pos_f(np.expand_dims(q, 1), np.expand_dims(p, 1)).reshape(-1)
+        link_dict['dist'] = lambda q, p, y: dst_f(np.expand_dims(q, 1), np.expand_dims(p, 1), np.expand_dims(y, 1))
+        link_dict['rep'] = lambda q, p, y: rep_f(np.expand_dims(q, 1), np.expand_dims(p, 1), np.expand_dims(y, 1)).reshape(-1)
+
+        all_links.append(link_dict)
     return all_links
 
 
@@ -66,17 +83,19 @@ dh_alpha = dh_a*0
 dh_d = dh_a*0
 dh_theta = dh_a*0
 dh_params = np.vstack((dh_d, dh_theta, dh_a, dh_alpha)).T
-T_arr = dh_fk(q, dh_params)
 robot = numeric_fk_model(q, dh_params, 10)
-dst = dist_to_point(robot, np.array([10, 0, 0]))
+y = np.array([10, 0, 0])
+dst = dist_to_point(robot, y)
 robot_sym = symbolic_fk_model(q, dh_params)
 l1 = robot_sym[1]
-pos = sp.lambdify(['q', 'p'], l1, 'numpy')
-y = robot['pts_int'][dst['linkidx']][dst['ptidx']]
-print(pos(np.expand_dims(q, 1), np.expand_dims(y, 1)))
-print('0')
+
+p = robot['pts_int'][dst['linkidx']][dst['ptidx']]
+print(l1['pos'](q, p))
+print(l1['dist'](q, p, y))
+print(l1['rep'](q, p, y))
+
+print('fin')
 #working symbolic position evaluation
-#TODO: symbolic distance evaluation
 #TODO: symbolic gradient evaluation
 
 
