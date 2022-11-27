@@ -1,6 +1,5 @@
-import matplotlib.pyplot as plt
 import numpy as np
-
+from plots import *
 
 def dh_transform(q, d, theta, a, alpha):
     """
@@ -79,33 +78,6 @@ def dist_to_point(robot, y):
     return res
 
 
-def init_robot_plot(links, xmin, xmax, ymin, ymax):
-    # Initialize the robot plot
-    plt.ion()
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.set_xlim(xmin, xmax)
-    ax.set_ylim(ymin, ymax)
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_aspect('equal')
-    line_h, = plt.plot([], [], 'bo-', linewidth=3, markersize=5)
-    plt.show()
-    return line_h
-
-
-def upd_r_h(links, ln):
-    # Update the robot plot
-    x_data = [links[0][0, 0]]
-    y_data = [links[0][0, 1]]
-    # add link end points to plot
-    for link in links:
-        x_data.append(link[-1, 0])
-        y_data.append(link[-1, 1])
-    ln.set_data(x_data, y_data)
-    plt.draw()
-
-    return 0
 
 def main():
     q = np.array([0, 0])
@@ -118,13 +90,16 @@ def main():
     robot = numeric_fk_model(q, dh_params, 10)
     link_pts = robot['links']
     r_h = init_robot_plot(link_pts, -10, 10, -10, 10)
+    c_h = plot_circ(np.array([8, 5]), 1)
     for i in range(1000):
         q = np.array([i/10, i/10])
         robot = numeric_fk_model(q, dh_params, 10)
         upd_r_h(robot['links'], r_h)
         dst = dist_to_point(robot, np.array([10, 0, 0]))
         print(dst)
+        c_h.set_center(q)
         plt.pause(0.0001)
+
 
 if __name__ == '__main__':
     main()
