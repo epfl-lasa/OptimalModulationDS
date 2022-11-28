@@ -7,8 +7,10 @@ import torch
 import time
 
 #define tensor parameters (cpu or cuda:0)
-params = {'device': 'cpu', 'dtype': torch.float32}
-#params = {'device': 'cuda:0', 'dtype': torch.float32}
+if 1:
+    params = {'device': 'cpu', 'dtype': torch.float32}
+else:
+    params = {'device': 'cuda:0', 'dtype': torch.float32}
 
 
 def main():
@@ -36,7 +38,7 @@ def main():
     #     plt.pause(0.0001)
 
     t0 = time.time()
-    for i in range(100000):
+    for i in range(100):
         link_pts, _ = numeric_fk_model(q, dh_params, 10)
     tf = time.time()
     print('numeric_fk_model time: ', tf-t0)

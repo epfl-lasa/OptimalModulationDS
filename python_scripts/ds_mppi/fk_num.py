@@ -54,8 +54,6 @@ def numeric_fk_model(q: torch.Tensor, dh_params: torch.Tensor, n_pts: int):
     n_dof = len(q)
     P_arr = dh_fk(q, dh_params)
     robot = dict()
-    # robot['links'] = []
-    # robot['pts_int'] = []
     links = []
     pts_int = []
     # Initialize the points array
@@ -71,8 +69,6 @@ def numeric_fk_model(q: torch.Tensor, dh_params: torch.Tensor, n_pts: int):
         T = P_arr[i + 1][:3, 3]
         # Compute the position of the point for this link
         pts = (R @ v.transpose(0, 1)).transpose(0, 1) + T
-        # robot['links'].append(pts)
-        # robot['pts_int'].append(v)
         links.append(pts)
         pts_int.append(v)
     return links, pts_int
@@ -107,17 +103,8 @@ def main():
     dh_theta = dh_a*0
     dh_params = (torch.vstack((dh_d, dh_theta, dh_a, dh_alpha)).T).to(**params)
     link_pts = numeric_fk_model(q, dh_params, 10)
-    #link_pts = robot['links']
-    # r_h = init_robot_plot(link_pts, -10, 10, -10, 10)
-    # c_h = plot_circ(np.array([8, 5]), 1)
     for i in range(300):
-        q = q+torch.tensor([0.01, 0.01]).to(**params)
-        robot = numeric_fk_model(q, dh_params, 10)
-        # upd_r_h(robot['links'], r_h)
-        # dst = dist_to_point(robot, np.array([10, 0, 0]))
-        # print(dst)
-        # c_h.set_center(q)
-        # plt.pause(0.0001)
+        link_pts, int_pts = numeric_fk_model(q, dh_params, 10)
 
 if __name__ == '__main__':
     main()
