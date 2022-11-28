@@ -1,4 +1,5 @@
 import torch
+from typing import List, Dict
 import numpy as np
 from plots import *
 
@@ -53,7 +54,6 @@ def numeric_fk_model(q: torch.Tensor, dh_params: torch.Tensor, n_pts: int):
     # Compute the transformation matrices
     n_dof = len(q)
     P_arr = dh_fk(q, dh_params)
-    robot = dict()
     links = []
     pts_int = []
     # Initialize the points array
@@ -74,22 +74,23 @@ def numeric_fk_model(q: torch.Tensor, dh_params: torch.Tensor, n_pts: int):
     return links, pts_int
 
 
-def dist_to_point(robot, y):
+@torch.jit.script
+def dist_to_point(links: List[torch.Tensor], y: torch.Tensor) -> Dict[str, torch.Tensor]:
     """
     Calculate the distance between the robot links and a point in task space.
     """
-    mindists = []
-    minidxs = []
+    mindists = torch.empty(0).to(y.device)
+    minidxs = torch.empty(0).to(y.device)
     res = dict()
-    for link_pts in robot['links']:
-        dist = np.linalg.norm(link_pts - y, 2, 1)
-        minidx = np.argmin(dist)
-        mindists.append(dist[minidx])
-        minidxs.append(minidx)
-    minidx = np.argmin(mindists)
+    for link_pts in links:
+        dist = torch.norm(link_pts - y, 2, 1)
+        minidx = torch.argmin(dist)
+        mindists = torch.hstack((mindists, dist[minidx]))
+        minidxs = torch.hstack((minidxs, minidx))
+    minidx = torch.argmin(mindists)
     res['mindist'] = mindists[minidx]
-    res['linkidx'] = minidx
-    res['ptidx'] = minidxs[minidx]
+    res['linkidx'] = minidx.int()
+    res['ptidx'] = minidxs[minidx].int()
     return res
 
 
@@ -102,10 +103,10 @@ def main():
     dh_d = dh_a*0
     dh_theta = dh_a*0
     dh_params = (torch.vstack((dh_d, dh_theta, dh_a, dh_alpha)).T).to(**params)
-    link_pts = numeric_fk_model(q, dh_params, 10)
-    for i in range(300):
-        link_pts, int_pts = numeric_fk_model(q, dh_params, 10)
-
+    link_pts, _ = numeric_fk_model(q, dh_params, 10)
+    y = torch.tensor([1, 1, 0]).to(**params)
+    res = dist_to_point(link_pts, y)
+    print(0)
 if __name__ == '__main__':
     main()
 

@@ -33,7 +33,7 @@ def plot_circ(c, r):
     # Plot a circle
     fig = plt.figure(1)
     ax = fig.get_axes()[0]
-    circ = plt.Circle(c, r, color='r', fill=False)
+    circ = plt.Circle(c[0:2], r, color='r', fill=False)
     ax.add_patch(circ)
     return circ
 

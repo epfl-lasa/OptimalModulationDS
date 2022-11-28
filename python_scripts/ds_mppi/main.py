@@ -12,7 +12,6 @@ if 1:
 else:
     params = {'device': 'cuda:0', 'dtype': torch.float32}
 
-
 def main():
     DOF = 2
     q = torch.zeros(DOF).to(**params)
@@ -24,22 +23,24 @@ def main():
     dh_params = (torch.vstack((dh_d, dh_theta, dh_a, dh_alpha)).T).to(**params)
     link_pts, _ = numeric_fk_model(q, dh_params, 10)
     robot_sym = symbolic_fk_model(q, dh_params)
-    r_h = init_robot_plot(link_pts, -10, 10, -10, 10)
-    y_p = torch.tensor([8, 5]).to(**params)
+    # r_h = init_robot_plot(link_pts, -10, 10, -10, 10)
+    y_p = torch.tensor([8, 5, 0]).to(**params)
     y_r = 1
-    c_h = plot_circ(y_p, y_r)
+    # c_h = plot_circ(y_p, y_r)
 
-    # for i in range(1000):
-    #     q = q+torch.tensor([0.01, 0.01]).to(**params)
-    #     link_pts = numeric_fk_model(q, dh_params, 10)['links']
-    #     upd_r_h(link_pts, r_h)
-    #     y_p = y_p-torch.tensor([0.01, 0.01]).to(**params)
-    #     c_h.set_center(y_p)
-    #     plt.pause(0.0001)
+    #warmup jit script
+    torch.jit.optimized_execution(True)
+    link_pts, v_links = numeric_fk_model(q, dh_params, 10)
+    dst = dist_to_point(link_pts, y_p)
 
     t0 = time.time()
-    for i in range(100):
-        link_pts, _ = numeric_fk_model(q, dh_params, 10)
+    for i in range(1000):
+        link_pts, v_links = numeric_fk_model(q, dh_params, 3)
+        dst = dist_to_point(link_pts, y_p)
+        #print(dst)
+        p_closest = v_links[dst['linkidx']][dst['ptidx']].cpu().numpy()
+        #mindist = robot_sym[dst['linkidx']]['dist'](q.cpu().numpy(), p_closest, y_p.cpu().numpy())
+        #rep = robot_sym[dst['linkidx']]['rep'](q.cpu().numpy(), p_closest, y_p.cpu().numpy())
     tf = time.time()
     print('numeric_fk_model time: ', tf-t0)
 if __name__ == '__main__':
