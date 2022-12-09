@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import sympy as sp
 import numpy as np
-#from fk_num import *
+
 
 def dh_transform_sym(q, d, theta, a, alpha):
     """
@@ -29,29 +29,38 @@ def dh_fk_sym(q, dh_params):
     # Loop through each joint
     for i, q_i in enumerate(q):
         # Extract the parameters for this joint
-        d, theta, a, alpha = dh_params[i]
+        d, theta, a, alpha = dh_params[i, :]
+        theta = 0
+        d = 0
+        alpha = 0
         # Compute the transformation for this joint
         T_prev = T[-1]
         T.append(T_prev @ dh_transform_sym(q_i, d, theta, a, alpha))
     return T
 
 
-def symbolic_fk_model(q, dh_params):
+def symbolic_fk_model(n_dof):
     """
     Build symbolic model of the robot
     Provide lambda functions for position, distance, and joint repulsion
     """
     # Compute the transformation matrices
-    n_dof = len(q)
     q_sym = sp.Matrix(sp.MatrixSymbol('q', n_dof, 1))
     p_sym = sp.Matrix(sp.MatrixSymbol('p', 3, 1))
     y_sym = sp.Matrix(sp.MatrixSymbol('y', 3, 1))
+    alphas = sp.symbols('alpha0:{}'.format(n_dof))
+    a = sp.symbols('a0:{}'.format(n_dof))
+    d = sp.symbols('d0:{}'.format(n_dof))
+    theta = sp.symbols('theta0:{}'.format(n_dof))
+    dh_params = sp.Matrix([d, theta, a, alphas]).T
     P_arr = dh_fk_sym(q_sym, dh_params)
+
     all_links = []
     a = dh_params[:, 2]
     # Initialize the points array
     # Loop through each joint
     for i in range(n_dof):
+        print(i)
         link_dict = dict()
         R = P_arr[i+1][:3, :3]
         T = P_arr[i+1][:3, 3]
@@ -64,40 +73,29 @@ def symbolic_fk_model(q, dh_params):
         # Jacobian
         J = pos.jacobian(q_sym)
         # Repulsion
-        rep = (ddist.T * J)
-        # Lambdidfy symbolic functions
-        pos_f = sp.lambdify(['q', 'p'], pos, 'numpy')
-        dst_f = sp.lambdify(['q', 'p', 'y'], dist, 'numpy')
-        rep_f = sp.lambdify(['q', 'p', 'y'], rep, 'numpy')
-        # Dimensions for numpy
-        link_dict['pos'] = lambda q, p: pos_f(np.expand_dims(q, 1), np.expand_dims(p, 1)).reshape(-1)
-        link_dict['dist'] = lambda q, p, y: dst_f(np.expand_dims(q, 1), np.expand_dims(p, 1), np.expand_dims(y, 1))
-        link_dict['rep'] = lambda q, p, y: rep_f(np.expand_dims(q, 1), np.expand_dims(p, 1), np.expand_dims(y, 1)).reshape(-1)
+        rep = ddist.T * J
+        link_dict['pos'] = pos
+        link_dict['dist'] = dist
+        link_dict['rep'] = rep
 
         all_links.append(link_dict)
     return all_links
 
 def main():
-    q = np.array([0, 0, 0])
-    dh_a = np.array([0, 3, 3, 3])
-    dh_alpha = dh_a * 0
-    dh_d = dh_a * 0
-    dh_theta = dh_a * 0
-    dh_params = np.vstack((dh_d, dh_theta, dh_a, dh_alpha)).T
-    #robot = numeric_fk_model(q, dh_params, 10)
-    y = np.array([10, 1, 0])
-    #dst = dist_to_point(robot, y)
-    robot_sym = symbolic_fk_model(q, dh_params)
-    l1 = robot_sym[1]
-    p = np.array([3, 0, 0])
-
-    #p = robot['pts_int'][dst['linkidx']][dst['ptidx']]
-    print(l1['pos'](q, p))
-    print(l1['dist'](q, p, y))
-    print(l1['rep'](q, p, y))
-
-    print('fin')
-
+    # Define the number of DOF
+    n_dof = 7
+    # Build the symbolic model
+    all_links = symbolic_fk_model(n_dof)
+    # Print the symbolic expressions for the distance and repulsion
+    with open('sym.txt', 'w') as f:
+        for i, link in enumerate(all_links):
+            f.writelines(str(f'\nLink {i+1}'))
+            f.writelines(str('\nPosition:\n'))
+            f.writelines(str(sp.simplify(link['pos'])))
+            f.writelines(str('\nDistance\n'))
+            f.writelines(str(sp.simplify(link['dist'])))
+            f.writelines(str('\nRepulsion\n'))
+            f.writelines(str(sp.simplify(link['rep'])))
 
 if __name__ == '__main__':
     main()

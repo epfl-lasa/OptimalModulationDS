@@ -5,7 +5,7 @@ vecspace = @(v1,v2,k) v1+linspace(0,1,k)'.*(v2-v1);
 global all_state
 %rng(1)
 %%
-dh_r = [0 3 3 ];
+dh_r = [0 3 3];
 d = dh_r*0;
 alpha = dh_r*0;
 base = eye(4);
@@ -27,7 +27,7 @@ state_max = [q_max, y_max, 10];
 n_pts = 20;
 link_sym = symbolic_fk_model(j_state_sym,dh_r,d,alpha,base, y_sym, p_sym);
 j_state = p_s;
-y_pos = [5; 0; 0];
+y_pos = [4; 0; 0];
 y_r = 1;
 link_num = numeric_fk_model(j_state,dh_r,d,alpha,base, y_pos, n_pts);
 all_state = [j_state; y_pos(1:2); y_r];
@@ -84,19 +84,19 @@ Z_mg = reshape(dst,size(X_mg));
 plot(ax_j, p_f(1), p_f(2), 'r*')
 N_STEPS = 50;
 dt = 0.2;
-N_TRAJ = 20;
+N_TRAJ = 10;
 
 %kernel sampling parameters
 N_KER = 0;
 N_KER_MAX = 50; 
 
 MU_C = zeros(DOFs, N_KER);
-S_NOMINAL = 0.02 * max(q_max-q_min); 
+S_NOMINAL = 0.01 * max(q_max-q_min); 
 MU_S = S_NOMINAL*ones(1, N_KER);
 MU_A = zeros(DOFs-1,N_KER); %alphas for tangential space
 SIGMA_C  = 0.0;
 SIGMA_S = 0.0;
-SIGMA_A = 0.1;
+SIGMA_A = 0.3;
 
 %plotting handlers
 h_traj = cell(1, N_TRAJ);
@@ -194,7 +194,7 @@ while norm(j_state-p_f)>1e-1
         %indices of trajectory points away from existing kernels
         idx_no_ker = zeros(size(idx_close));
 %         idx_no_ker(all(abs(ker_val{i})<0.5,1)) = 1;
-        idx_no_ker(sum(abs(ker_val{i}),1)<0.1) = 1;
+        idx_no_ker(sum(abs(ker_val{i}),1)<0.3) = 1;
 
         %potential new kernel locations
         potential_ker = [potential_ker traj{i}(:, idx_close & idx_no_ker)];

@@ -54,8 +54,8 @@ def numeric_fk_model(q: torch.Tensor, dh_params: torch.Tensor, n_pts: int):
     # Compute the transformation matrices
     n_dof = len(q)
     P_arr = dh_fk(q, dh_params)
-    links = []
-    pts_int = []
+    links = torch.zeros((n_dof, n_pts, 3)).to(q.device)
+    pts_int = torch.zeros((n_dof, n_pts, 3)).to(q.device)
     # Initialize the points array
     # Loop through each joint
     a = dh_params[:, 2]
@@ -69,31 +69,90 @@ def numeric_fk_model(q: torch.Tensor, dh_params: torch.Tensor, n_pts: int):
         T = P_arr[i + 1][:3, 3]
         # Compute the position of the point for this link
         pts = (R @ v.transpose(0, 1)).transpose(0, 1) + T
-        links.append(pts)
-        pts_int.append(v)
+        links[i] = pts
+        pts_int[i] = v
     return links, pts_int
 
 
 @torch.jit.script
-def dist_to_point(links: List[torch.Tensor], y: torch.Tensor) -> Dict[str, torch.Tensor]:
+def numeric_fk_model_vec(q: torch.Tensor, dh_params: torch.Tensor, n_pts: int):
+    """
+    Vectorized version of numeric_fk_model
+    """
+    n_q = q.shape[0]
+    link_pts = torch.zeros((n_q, 2, n_pts, 3)).to(q.device)
+    pts_int = torch.zeros((n_q, 2, n_pts, 3)).to(q.device)
+    for i in range(n_q):
+        link_pts[i], pts_int[i] = numeric_fk_model(q[i], dh_params, n_pts)
+    return link_pts, pts_int
+
+
+@torch.jit.script
+def dist_to_point(links: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+#def dist_to_point(links: torch.Tensor, y: torch.Tensor) -> Dict[str, torch.Tensor]:
     """
     Calculate the distance between the robot links and a point in task space.
     """
-    mindists = torch.empty(0).to(y.device)
-    minidxs = torch.empty(0).to(y.device)
-    res = dict()
-    for link_pts in links:
-        dist = torch.norm(link_pts - y, 2, 1)
-        minidx = torch.argmin(dist)
-        mindists = torch.hstack((mindists, dist[minidx]))
-        minidxs = torch.hstack((minidxs, minidx))
-    minidx = torch.argmin(mindists)
-    res['mindist'] = mindists[minidx]
-    res['linkidx'] = minidx.int()
-    res['ptidx'] = minidxs[minidx].int()
+    res = torch.empty(3).to(y.device)
+    dist = torch.norm(links - y[0:3], 2, 2) - y[3]
+    mindist_all, minidx_pts = torch.min(dist, 1)
+    mindist, idx_link = torch.min(mindist_all, 0)
+    idx_pt = minidx_pts[idx_link]
+    # res['mindist'] = mindist
+    # res['linkidx'] = idx_link
+    # res['ptidx'] = idx_pt
+    res[0] = mindist
+    res[1] = idx_link
+    res[2] = idx_pt
+    return res
+@torch.jit.script
+def dist_to_point_vec(links: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+    # calculate distance between each point of each link of each robot to the point y
+    dst = torch.norm(links - y[0:3], 2, 3) - y[3]
+    # find the minimum distance and the corresponding link and point
+    mindist_all, minidx_pts = torch.min(dst, 2)
+    mindist, idx_link = torch.min(mindist_all, 1)
+    idx_pt = minidx_pts[torch.arange(mindist.shape[0]), idx_link]
+    # gather the minimum distance and the corresponding link and point
+    res = torch.stack((mindist, idx_link, idx_pt), 1)
     return res
 
 
+@torch.jit.script
+def dist_to_points_vec(links: torch.Tensor, obs: torch.Tensor) -> torch.Tensor:
+    """
+    Calculate the distance between the robot links and multiple spheres in task space.
+    """
+    n_traj = links.shape[0]
+    n_obs = obs.shape[0]
+    n_links = links.shape[1]
+    n_pts = links.shape[2]
+    res = torch.empty((n_traj, n_obs, 3)).to(links.device)
+    for i in range(n_obs):
+        res[:, i, :] = dist_to_point_vec(links, obs[i])
+        # for j in range(n_links):
+        #     res[j, i, :] = dist_to_point(links[j], obs[i])
+    return res
+
+@torch.jit.script
+def dist_tens(links: torch.Tensor, obs: torch.Tensor) -> torch.Tensor:
+    """
+    Calculate the distance between the robot links and multiple spheres in task space.
+    """
+    obs_pos = obs[:, 0:3]
+    obs_rad = obs[:, 3]
+    # calculate distance between each point of each link of each robot to each point in obs
+    pos_dif = links.unsqueeze(2)-obs_pos.unsqueeze(1)
+    dst = torch.norm(pos_dif, 2, 4) - obs_rad.unsqueeze(1)
+    # find the minimum distance and the corresponding link and point
+    mindist_pts, minidx_pts = torch.min(dst, 3)
+    mindist_obs, minidx_obs = torch.min(mindist_pts, 2)
+    mindist_link, minidx_link = torch.min(mindist_obs, 1)
+    idx_obs = minidx_obs[torch.arange(mindist_link.shape[0]), minidx_link]
+    idx_pt = minidx_pts[torch.arange(mindist_link.shape[0]), minidx_link, idx_obs]
+    # gather the minimum distance and the corresponding link and point
+    res = torch.stack((mindist_link, idx_obs, minidx_link, idx_pt), 1)
+    return res
 
 def main():
     params = {'device': 'cpu', 'dtype': torch.float32}
@@ -103,7 +162,7 @@ def main():
     dh_d = dh_a*0
     dh_theta = dh_a*0
     dh_params = (torch.vstack((dh_d, dh_theta, dh_a, dh_alpha)).T).to(**params)
-    link_pts, _ = numeric_fk_model(q, dh_params, 10)
+    link_pts, pts_int = numeric_fk_model(q, dh_params, 10)
     y = torch.tensor([1, 1, 0]).to(**params)
     res = dist_to_point(link_pts, y)
     print(0)
