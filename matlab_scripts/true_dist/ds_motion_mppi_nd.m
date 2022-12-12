@@ -27,7 +27,7 @@ state_max = [q_max, y_max, 10];
 n_pts = 20;
 link_sym = symbolic_fk_model(j_state_sym,dh_r,d,alpha,base, y_sym, p_sym);
 j_state = p_s;
-y_pos = [4; 0; 0];
+y_pos = [5; 0; 0];
 y_r = 1;
 link_num = numeric_fk_model(j_state,dh_r,d,alpha,base, y_pos, n_pts);
 all_state = [j_state; y_pos(1:2); y_r];
@@ -91,7 +91,7 @@ N_KER = 0;
 N_KER_MAX = 50; 
 
 MU_C = zeros(DOFs, N_KER);
-S_NOMINAL = 0.01 * max(q_max-q_min); 
+S_NOMINAL = 0.03 * max(q_max-q_min); 
 MU_S = S_NOMINAL*ones(1, N_KER);
 MU_A = zeros(DOFs-1,N_KER); %alphas for tangential space
 SIGMA_C  = 0.0;
@@ -278,7 +278,7 @@ function [traj, dst_arr, ker_val] = propagate_mod(pol, j_state, q_f, dt, N, dh_r
 %             i
 %         end
         %nominal motion
-        q_dot = A*(q_cur-q_f);
+        q_dot_nom = A*(q_cur-q_f);
         %current distance
         [dst, n_v] = getClosestDistance(q_cur', y_pos, link_sym, dh_r,0*dh_r,0*dh_r,eye(4), 10);
         dst = dst - y_r - 0.;
@@ -300,15 +300,15 @@ function [traj, dst_arr, ker_val] = propagate_mod(pol, j_state, q_f, dt, N, dh_r
             ker_val(j, i) = rbf(q_cur,pol.x0(:,j),pol.sigma(j));
             u_cur = u_cur + pol.alpha(:,j)/norm(pol.alpha(:,j))*ker_val(j, i);
         end
-        q_dot = E*D*E' * (q_dot + sum(u_cur'.*E(:,2:end),2) + (1-l_n)*E(:,1));
-
+        q_dot = E*D*E' * (q_dot_nom + sum(u_cur'.*E(:,2:end),2) + (1-l_n)*E(:,1));
+        %q_dot = E*D*E' * q_dot_nom;
         %q_dot = E*D*E' * alpha* q_dot +E*D*E' * 1-alpha v(i) E*D*E' * 1-alpha v(i);
+        if norm(q_dot)>1e-1
+            q_dot = q_dot/norm(q_dot);
+        end
         %slow for collision
         if dst < 0
             q_dot = q_dot*0.1;
-        end
-        if norm(q_dot)>1e-1
-            q_dot = q_dot/norm(q_dot);
         end
         %slow for joint_limits
         if any(q_cur<=q_min') || any(q_cur>=q_max')
@@ -318,6 +318,7 @@ function [traj, dst_arr, ker_val] = propagate_mod(pol, j_state, q_f, dt, N, dh_r
         %q_cur = min(max(q_cur, q_min'), q_max');
 
         traj(:, i) = q_cur;
+        %q_cur
     end    
 end
 
@@ -380,9 +381,9 @@ function [dist, rep] = getClosestDistance(j_state, y_pos, link_sym, r,d,alpha,ba
     link_num = numeric_fk_model(j_state,r,d,alpha,base, y_pos, n_pts);
     ii = link_num{1}.minidx(1);
     jj = link_num{1}.minidx(2);
-    if ii==1 && jj == 1
-        jj = 2;
-    end
+%     if ii==1 && jj == 1
+%         jj = 2;
+%     end
     pt_closest = link_num{ii}.pts(jj,:);
     dist = link_sym{ii}.dst_fcn(j_state', y_pos, pt_closest');
     rep  = link_sym{ii}.rep_fcn(j_state', y_pos, pt_closest');
@@ -403,7 +404,7 @@ end
 
 function link = numeric_fk_model(j_state,r,d,alpha,base,y, N_pts)
     DOF = length(r)-1;
-    vecspace = @(v1,v2,k) v1+linspace(0,1,max(2,k))'.*(v2-v1);
+    vecspace = @(v1,v2,k) v1+linspace(0.01,1,max(2,k))'.*(v2-v1);
     P = dh_fk(j_state,r,d,alpha,base);
     dist = @(x,y) sqrt((x-y)'*(x-y));
     ddist = @(x,y) 1/sqrt((x-y)'*(x-y))*[x(1)-y(1);x(2)-y(2); x(3)-y(3)];

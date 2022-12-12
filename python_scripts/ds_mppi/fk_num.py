@@ -62,7 +62,7 @@ def numeric_fk_model(q: torch.Tensor, dh_params: torch.Tensor, n_pts: int):
     for i in range(n_dof):
         p0 = torch.tensor([0, 0, 0]).to(q.device)
         p1 = torch.hstack((a[i+1], torch.tensor([0.0, 0.0]).to(q.device)))
-        lspan = torch.linspace(0, 1, n_pts).unsqueeze(1).to(q.device)
+        lspan = torch.linspace(0.01, 1, n_pts).unsqueeze(1).to(q.device)
         v = torch.tile(p0, (n_pts, 1)) + torch.tile(p1, (n_pts, 1)) * lspan
 
         R = P_arr[i + 1][:3, :3]
