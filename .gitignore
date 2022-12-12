@@ -1,6 +1,7 @@
 # Prerequisites
 *.d
-
+*.pt
+*.mat
 # Object files
 *.o
 *.ko
