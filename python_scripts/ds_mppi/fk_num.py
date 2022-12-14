@@ -80,8 +80,9 @@ def numeric_fk_model_vec(q: torch.Tensor, dh_params: torch.Tensor, n_pts: int):
     Vectorized version of numeric_fk_model
     """
     n_q = q.shape[0]
-    link_pts = torch.zeros((n_q, 2, n_pts, 3)).to(q.device)
-    pts_int = torch.zeros((n_q, 2, n_pts, 3)).to(q.device)
+    n_dof = q.shape[1]
+    link_pts = torch.zeros((n_q, n_dof, n_pts, 3)).to(q.device)
+    pts_int = torch.zeros((n_q, n_dof, n_pts, 3)).to(q.device)
     for i in range(n_q):
         link_pts[i], pts_int[i] = numeric_fk_model(q[i], dh_params, n_pts)
     return link_pts, pts_int
