@@ -20,6 +20,7 @@ def tangent_basis_vec(normal_tens):
         T[i] = tangent_basis(n_v)
     return T
 
+@torch.jit.script
 def get_mindist(all_links, obs):
     mindists = dist_tens(all_links, obs)
     # calculate repulsions using fk_sym_gen

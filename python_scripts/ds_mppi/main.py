@@ -6,6 +6,7 @@ import numpy as np
 from propagation import *
 import torch
 import time
+from policy import *
 
 #define tensor parameters (cpu or cuda:0)
 if 1:
@@ -14,8 +15,8 @@ else:
     params = {'device': 'cuda:0', 'dtype': torch.float32}
 
 def main_int():
-    DOF = 7
-    L = 1
+    DOF = 2
+    L = 2
     # Initial state
     q_0 = torch.zeros(DOF).to(**params)
     q_f = torch.zeros(DOF).to(**params)
@@ -40,7 +41,8 @@ def main_int():
     for i in range(30):
         all_traj = propagate_mod(q_cur, q_f, dh_params, obs, dt, 1, 1, A, dh_a)
     t0 = time.time()
-    for ITER in range(50):
+    N_ITER = 0
+    while torch.norm(q_cur - q_f) > 0.1:
         # Propagate modulated DS
         all_traj = propagate_mod(q_cur, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a)
         # Update current robot state
@@ -50,13 +52,17 @@ def main_int():
         # obs[0, 0] += 0.03
         # plot_obs_update(o_h_arr, obs)
         plt.pause(0.0001)
+        N_ITER += 1
+        if N_ITER > 100:
+            break
         #print(q_cur)
     td = time.time() - t0
     print('Time: ', td)
-    print('Time per iteration: ', td/ITER, 'Hz: ', 1/(td/ITER))
-    print('Time per rollout: ', td/(ITER*N_traj))
-    print('Time per rollout step: ', td/(ITER*N_traj*dt_H))
-    print('f')
+    print('Time per iteration: ', td/N_ITER, 'Hz: ', 1/(td/N_ITER))
+    print('Time per rollout: ', td/(N_ITER*N_traj))
+    print('Time per rollout step: ', td/(N_ITER*N_traj*dt_H))
+    plt.pause(1000)
+
 
 
 if __name__ == '__main__':

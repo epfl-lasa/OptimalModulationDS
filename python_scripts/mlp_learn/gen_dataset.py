@@ -9,8 +9,8 @@ import time
 
 params = {'device': 'cpu', 'dtype': torch.float32}
 DOF = 2
-q_min = np.array([-np.pi, -np.pi])
-q_max = np.array([np.pi, np.pi])
+q_min = -np.pi*np.ones(DOF)*1.1
+q_max = np.pi*np.ones(DOF)*1.1
 p_min = np.array([-10, -10, 0, 0])
 p_max = np.array([10, 10, 0, 0])
 
@@ -27,13 +27,14 @@ rand_jpos = torch.tensor(rand_jpos).to(**params)
 t0 = time.time()
 all_fk, all_int_pts = numeric_fk_model_vec(rand_jpos, dh_params, 20)
 
-data = torch.zeros(N_JPOS*N_PPOS, DOF+3+1)
+data = torch.zeros(N_JPOS*N_PPOS, DOF+3+DOF)
 for i in range(N_JPOS):
     print(i)
     rand_ppos = np.random.uniform(p_min, p_max, (N_PPOS, 4))
     rand_ppos = torch.tensor(rand_ppos).to(**params)
     for j in range(N_PPOS):
-        res = dist_to_point(all_fk[i], rand_ppos[j])
-        data[i*N_PPOS+j] = torch.hstack((res[0], rand_jpos[i], rand_ppos[j, 0:3]))
+        dist = torch.norm(all_fk[i] - rand_ppos[j, 0:3], 2, 2)
+        res, _ = torch.min(dist, 1)
+        data[i*N_PPOS+j] = torch.hstack((rand_jpos[i], rand_ppos[j, 0:3], res))
 print("time: %4.3f s"%(time.time()-t0))
-torch.save(data, 'data.pt')
+torch.save(data, '%d_dof_data.pt'%DOF)

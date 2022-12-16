@@ -48,9 +48,9 @@ def create_dataset(robot_name):
     idx_train = np.arange(0, int(n_size * train_ratio))
     idx_val = np.arange(idx_train[-1] + 1, int(n_size * (train_ratio + test_ratio)))
     idx_test = np.arange(idx_val[-1] + 1, int(n_size))
-
-    x = torch.Tensor(data[L1:L2, 1:-1]).to(device, dtype=torch.float16)
-    y = torch.Tensor(data[L1:L2, 0]).to(device, dtype=torch.float16).unsqueeze(1)
+    q_dof = 2
+    x = torch.Tensor(data[L1:L2, 0:q_dof+3]).to(device, dtype=torch.float16)
+    y = torch.Tensor(data[L1:L2, -q_dof:]).to(device, dtype=torch.float16)
     #y[y<0]*=5
     #y[y==0] = 1
     dof = x.shape[1]
