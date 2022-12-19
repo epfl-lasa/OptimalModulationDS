@@ -71,20 +71,39 @@ class TensorPolicyMPPI:
         else:
             print('Not adding new kernel at: maximum number of kernels reached', q)
 
-dof = 2
-n_traj = 5
-tens_args = {'device': 'cpu', 'dtype': torch.float32}
-P = TensorPolicyMPPI(n_traj, dof, tens_args)
-t0 = time.time()
-torch.manual_seed(0)
-for i in range(1000):
-    P.add_kernel(torch.tensor([i/100, i/100], **tens_args))
-    P.sample_policy()
-    w_tmp = torch.arange(0, 1, 1/n_traj, **tens_args)
-    w_tmp = (w_tmp/sum(w_tmp)).flip(0)
-    P.update_policy(w_tmp, 0.1)
-print(P.mu_c.shape)
-print(P.sigma_c.shape)
-print(P.alpha_c.shape)
+@torch.jit.script
+def eval_policy(q: torch.Tensor,
+                mu: torch.Tensor,
+                sigma: torch.Tensor,
+                alphas: torch.Tensor):
+    # Evaluate policy at q
+    # alphas: weights of RBF kernels
+    # mu: centers of RBF kernels
+    # sigma: standard deviations of RBF kernels
+    # q: state
+    # return: perturbation along tangent directions
+    numerator = torch.norm(q[:, None, :]-mu, 2, 2, keepdim=True)**2
+    denominator = 2 * sigma.unsqueeze(2)**2
+    exp_term = torch.exp(-numerator/denominator)
+    kernel_value = torch.sum(alphas * exp_term, 1)
+    return kernel_value
 
-print(time.time() - t0, 'sec')
+
+if __name__ == '__main__':
+    dof = 2
+    n_traj = 5
+    tens_args = {'device': 'cpu', 'dtype': torch.float32}
+    P = TensorPolicyMPPI(n_traj, dof, tens_args)
+    t0 = time.time()
+    torch.manual_seed(0)
+    for i in range(1000):
+        P.add_kernel(torch.tensor([i/100, i/100], **tens_args))
+        P.sample_policy()
+        w_tmp = torch.arange(0, 1, 1/n_traj, **tens_args)
+        w_tmp = (w_tmp/sum(w_tmp)).flip(0)
+        P.update_policy(w_tmp, 0.1)
+    print(P.mu_c.shape)
+    print(P.sigma_c.shape)
+    print(P.alpha_c.shape)
+
+    print(time.time() - t0, 'sec')

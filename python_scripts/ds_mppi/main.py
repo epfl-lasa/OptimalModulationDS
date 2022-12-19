@@ -15,7 +15,7 @@ else:
     params = {'device': 'cuda:0', 'dtype': torch.float32}
 
 def main_int():
-    DOF = 2
+    DOF = 3
     L = 2
     # Initial state
     q_0 = torch.zeros(DOF).to(**params)
@@ -42,9 +42,16 @@ def main_int():
         all_traj = propagate_mod(q_cur, q_f, dh_params, obs, dt, 1, 1, A, dh_a)
     t0 = time.time()
     N_ITER = 0
+    P = TensorPolicyMPPI(N_traj, DOF, params)
+    P.add_kernel(q_0)
+    P.add_kernel(q_0*1.1)
+    P.add_kernel(q_0*0.9)
+
     while torch.norm(q_cur - q_f) > 0.1:
+        # Sample random policies
+        P.sample_policy()
         # Propagate modulated DS
-        all_traj = propagate_mod(q_cur, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a)
+        all_traj = propagate_mod_policy(P, q_cur, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a)
         # Update current robot state
         q_cur = all_traj[0, 1, :]
         cur_fk, _ = numeric_fk_model(q_cur, dh_params, 10)
