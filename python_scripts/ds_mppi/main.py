@@ -43,15 +43,21 @@ def main_int():
     t0 = time.time()
     N_ITER = 0
     P = TensorPolicyMPPI(N_traj, DOF, params)
-    P.add_kernel(q_0)
-    P.add_kernel(q_0*1.1)
-    P.add_kernel(q_0*0.9)
-
+    #P.add_kernel(q_0)
+    #P.add_kernel(q_0*1.1)
+    #P.add_kernel(q_0*0.9)
+    thr_dist = 0.4
+    thr_rbf = 0.2
     while torch.norm(q_cur - q_f) > 0.1:
         # Sample random policies
         P.sample_policy()
         # Propagate modulated DS
-        all_traj = propagate_mod_policy(P, q_cur, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a)
+        all_traj, closests_dist_all, kernel_val_all = propagate_mod_policy(P, q_cur, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a)
+        # Check trajectory for new kernel candidates
+        kernel_candidates = check_traj_for_kernels(all_traj, closests_dist_all, kernel_val_all, thr_dist, thr_rbf)
+        if len(kernel_candidates) > 0:
+            rand_idx = torch.randint(kernel_candidates.shape[0], (1,))
+            P.add_kernel(kernel_candidates[rand_idx[0]])
         # Update current robot state
         q_cur = all_traj[0, 1, :]
         cur_fk, _ = numeric_fk_model(q_cur, dh_params, 10)
