@@ -5,7 +5,7 @@ vecspace = @(v1,v2,k) v1+linspace(0,1,k)'.*(v2-v1);
 global all_state
 %rng(1)
 %%
-dh_r = [0 3 3];
+dh_r = [0 1 1 1 1 1];
 d = dh_r*0;
 alpha = dh_r*0;
 base = eye(4);
@@ -260,6 +260,7 @@ while norm(j_state-p_f)>1e-1
     MU_S = (1-UPD_RATE).*MU_S + UPD_RATE.*sum(w'.*sigmas);
     MAIN_ITER = MAIN_ITER+1;
     toc
+    1/toc
 end
 
 %% functions 

@@ -15,8 +15,8 @@ else:
     params = {'device': 'cuda:0', 'dtype': torch.float32}
 
 def main_int():
-    DOF = 3
-    L = 2
+    DOF = 7
+    L = 1
     # Initial state
     q_0 = torch.zeros(DOF).to(**params)
     q_f = torch.zeros(DOF).to(**params)
@@ -27,7 +27,7 @@ def main_int():
     dh_a[1:] = L  # link length
     dh_params = torch.vstack((dh_a*0, dh_a*0, dh_a, dh_a*0)).T
     # Obstacle spheres (x, y, z, r)
-    obs = torch.tensor([[5, 0, 0, 1]]).to(**params)
+    obs = torch.tensor([[4, 0, 0, 1]]).to(**params)
     # Plotting
     r_h = init_robot_plot(dh_params, -10, 10, -10, 10)
     o_h_arr = plot_obs_init(obs)
@@ -66,7 +66,7 @@ def main_int():
         # plot_obs_update(o_h_arr, obs)
         plt.pause(0.0001)
         N_ITER += 1
-        if N_ITER > 100:
+        if N_ITER > 1000:
             break
         #print(q_cur)
     td = time.time() - t0
