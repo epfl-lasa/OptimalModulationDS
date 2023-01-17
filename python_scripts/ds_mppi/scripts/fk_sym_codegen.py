@@ -9,13 +9,13 @@ def dh_transform_sym(q, d, theta, a, alpha):
     """
     sa = sp.sin(alpha)
     ca = sp.cos(alpha)
-    sq = sp.sin(q+theta)
-    cq = sp.cos(q+theta)
+    sq = sp.sin(q + theta)
+    cq = sp.cos(q + theta)
     T = sp.Matrix([
-        [cq,        -sq,    0,      a],
-        [sq * ca,   cq*ca,  -sa,    -d*sa],
-        [sq * sa,   cq*sa,  ca,     d*ca],
-        [0,         0,      0,      1]
+        [cq, -sq, 0, a],
+        [sq * ca, cq * ca, -sa, -d * sa],
+        [sq * sa, cq * sa, ca, d * ca],
+        [0, 0, 0, 1]
     ])
     return T
 
@@ -62,14 +62,14 @@ def symbolic_fk_model(n_dof):
     for i in range(n_dof):
         print(i)
         link_dict = dict()
-        R = P_arr[i+1][:3, :3]
-        T = P_arr[i+1][:3, 3]
+        R = P_arr[i + 1][:3, :3]
+        T = P_arr[i + 1][:3, 3]
         # Compute the position of the point on this link
         pos = R @ p_sym + T
         # Distance for point on link to task space point
         dist = sp.sqrt(((pos - y_sym).T * (pos - y_sym))[0])
         # Task space gradient
-        ddist = 1/dist * (pos - y_sym)
+        ddist = 1 / dist * (pos - y_sym)
         # Jacobian
         J = pos.jacobian(q_sym)
         # Repulsion
@@ -81,6 +81,7 @@ def symbolic_fk_model(n_dof):
         all_links.append(link_dict)
     return all_links
 
+
 def main():
     # Define the number of DOF
     n_dof = 7
@@ -89,7 +90,7 @@ def main():
     # Print the symbolic expressions for the distance and repulsion
     with open('sym.txt', 'w') as f:
         for i, link in enumerate(all_links):
-            f.writelines(str(f'\nLink {i+1}'))
+            f.writelines(str(f'\nLink {i + 1}'))
             f.writelines(str('\nPosition:\n'))
             f.writelines(str(sp.simplify(link['pos'])))
             f.writelines(str('\nDistance\n'))
@@ -97,8 +98,6 @@ def main():
             f.writelines(str('\nRepulsion\n'))
             f.writelines(str(sp.simplify(link['rep'])))
 
+
 if __name__ == '__main__':
     main()
-
-
-

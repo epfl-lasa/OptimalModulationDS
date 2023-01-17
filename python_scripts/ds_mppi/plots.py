@@ -15,6 +15,7 @@ def init_robot_plot(links, xmin, xmax, ymin, ymax):
     plt.show()
     return line_h
 
+
 def init_jpos_plot(xmin, xmax, ymin, ymax):
     # Initialize the joint position plot
     plt.ion()
@@ -35,6 +36,7 @@ def upd_jpos_plot(jpos, ln):
     ln.set_data(jpos[:, 0], jpos[:, 1])
     plt.draw()
     return 0
+
 
 def upd_r_h(links, ln):
     # Update the robot plot
@@ -57,13 +59,14 @@ def plot_circ(c, r):
     ax.add_patch(circ)
     return circ
 
+
 def plot_obs_init(obstacles):
     o_h = []
     for obstacle in obstacles:
         o_h.append(plot_circ(obstacle[0:3], obstacle[3]))
     return o_h
 
+
 def plot_obs_update(o_h, obstacles):
     for i, obstacle in enumerate(obstacles):
         o_h[i].center = obstacle[0:2]
-

@@ -31,18 +31,16 @@ import os
 import matplotlib.pyplot as plt
 from sdf.robot_sdf import RobotSdfCollisionNet
 
-
 device = torch.device('cuda', 0)
 tensor_args = {'device': device, 'dtype': torch.float32}
 q_dof = 7
-data = torch.load('datasets/%d_dof_data.pt'%q_dof).to(**tensor_args)
-data_x = data[:, 0:q_dof+3]
+data = torch.load('datasets/%d_dof_data.pt' % q_dof).to(**tensor_args)
+data_x = data[:, 0:q_dof + 3]
 data_y = data[:, -q_dof:]
 n_size = data.shape[0]
 train_ratio = 0.98
 test_ratio = 0.01
 val_ratio = 1 - train_ratio - test_ratio
-
 
 idx_train = np.arange(0, int(n_size * train_ratio))
 idx_val = np.arange(idx_train[-1] + 1, int(n_size * (train_ratio + test_ratio)))
@@ -55,17 +53,18 @@ y_val = data_y[idx_val, :]
 x_test = data_x[idx_test, :]
 y_test = data_y[idx_test, :]
 
-#y[y<0]*=5
-#y[y==0] = 1
+# y[y<0]*=5
+# y[y==0] = 1
 
 s = 128
 n_layers = 3
 skips = []
-fname = '%ddof_sdf_%dx%d_mesh.pt'%(q_dof, s, n_layers)
+fname = '%ddof_sdf_%dx%d_mesh.pt' % (q_dof, s, n_layers)
 if skips == []:
-    n_layers-=1
-nn_model = RobotSdfCollisionNet(in_channels=x_train.shape[1], out_channels=y_train.shape[1], layers=[s] * n_layers, skips=skips)
-nn_model.load_weights('models/'+fname, tensor_args)
+    n_layers -= 1
+nn_model = RobotSdfCollisionNet(in_channels=x_train.shape[1], out_channels=y_train.shape[1], layers=[s] * n_layers,
+                                skips=skips)
+nn_model.load_weights('models/' + fname, tensor_args)
 
 nn_model.model.to(**tensor_args)
 
@@ -73,14 +72,13 @@ model = nn_model.model
 nelem = sum([param.nelement() for param in model.parameters()])
 print(repr(model))
 print("Sum of parameters:%d" % nelem)
-#time.sleep(2)
+# time.sleep(2)
 
 # scale dataset: (disabled because of nerf features!)
 mean_x = torch.mean(x_train, dim=0) * 0.0
 std_x = torch.std(x_train, dim=0) * 0.0 + 1.0
 mean_y = torch.mean(y_train, dim=0) * 0.0
 std_y = torch.std(y_train, dim=0) * 0.0 + 1.0
-
 
 optimizer = torch.optim.Adam(model.parameters(), lr=2e-3)
 
@@ -117,7 +115,7 @@ for e in range(epochs):
     with torch.cuda.amp.autocast():
         y_pred = model.forward(x_val)
         val_loss = F.mse_loss(y_pred, y_val, reduction='mean')
-        ee_loss_close = F.l1_loss(y_pred[idx_close_val][:,-1], y_val[idx_close_val][:,-1], reduction='mean')
+        ee_loss_close = F.l1_loss(y_pred[idx_close_val][:, -1], y_val[idx_close_val][:, -1], reduction='mean')
     if e == 0:
         min_loss = val_loss
     scheduler.step(val_loss)
@@ -134,7 +132,7 @@ for e in range(epochs):
                 'norm': {'x': {'mean': mean_x, 'std': std_x},
                          'y': {'mean': mean_y, 'std': std_y}}
             },
-            'models/'+fname)
+            'models/' + fname)
         min_loss = val_loss
         print(y_pred[0, :])
         print(y_val[0, :])
@@ -142,9 +140,9 @@ for e in range(epochs):
         #     break
     print(
         "Epoch: %d (Saved at %d), Train Loss: %4.3f, Validation Loss: %4.3f (%4.3f), Epoch time: %4.3f s, LR = %4.8f" % (
-            e, e-e_notsaved+1, train_loss.item(), val_loss.item(), ee_loss_close.item(), time.time() - t0,
+            e, e - e_notsaved + 1, train_loss.item(), val_loss.item(), ee_loss_close.item(), time.time() - t0,
             optimizer.param_groups[0]["lr"]))
-    #print(abs(y_pred-y_val).mean(0))
+    # print(abs(y_pred-y_val).mean(0))
 
 # with torch.no_grad():
 #     x = x_test  # [y_test[:,0] > 0.0]
