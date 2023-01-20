@@ -100,7 +100,7 @@ class RobotSdfCollisionNet():
                         grads[:, :, k] = q.grad  # fill in one column of Jacobian
                         q.grad.zero_()  # .backward() accumulates gradients, so reset to zero
                 else:
-                    grads = torch.zeros((q.shape[0], q.shape[1], 1))
+                    grads = torch.zeros((q.shape[0], q.shape[1], 1), device = q.device, dtype = q.dtype)
                     grd[list(range(q.shape[0])), minidxMask] = 1
                     dist_scale.backward(gradient=grd, retain_graph=False)
                     grads[:, :, 0] = q.grad  # fill in one column of Jacobian
