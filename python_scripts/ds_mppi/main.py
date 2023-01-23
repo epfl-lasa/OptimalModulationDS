@@ -1,16 +1,12 @@
-import numpy as np
-from fk_num import *
-from fk_sym_gen import *
-from plots import *
-import numpy as np
 from propagation import *
-import torch
-import time
-from policy import *
-import sys, os
-#
-from torch.profiler import profile, record_function, ProfilerActivity
+import sys
 
+#
+from torch.profiler import record_function
+
+from policy import *
+from propagation import *
+from MPPI import *
 sys.path.append('../mlp_learn/')
 from sdf.robot_sdf import RobotSdfCollisionNet
 
@@ -24,6 +20,7 @@ else:
 def main_int():
     DOF = 2
     L = 3
+
     # Load nn model
     s = 256
     n_layers = 5
@@ -67,37 +64,37 @@ def main_int():
     # P.add_kernel(q_0*0.9)
     thr_dist = 1
     thr_rbf = 0.1
-    all_traj, closests_dist_all, kernel_val_all = propagate_mod_policy_nn(P, q_cur, q_f, dh_params, obs, dt, dt_H,
-                                                                       N_traj, A, dh_a, nn_model)
+    #all_traj, closests_dist_all, kernel_val_all = propagate_mod_policy_nn(P, q_cur, q_f, dh_params, obs, dt, dt_H,
+    #                                                                   N_traj, A, dh_a, nn_model)
+    mppi = MPPI(P, q_0, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a, nn_model)
     while torch.norm(q_cur - q_f) > 0.1:
         t_iter = time.time()
         # Sample random policies
-        with record_function("policy sampling"):
-            P.sample_policy()
+        mppi.P.sample_policy()
         # Propagate modulated DS
 
         #all_traj, closests_dist_all, kernel_val_all = propagate_mod_policy(P, q_cur, q_f, dh_params, obs, dt, dt_H,
         #                                                                   N_traj, A, dh_a)
-        with record_function("propagation general"):
-            all_traj, closests_dist_all, kernel_val_all = propagate_mod_policy_nn(P, q_cur, q_f, dh_params, obs, dt, dt_H,
-                                                                           N_traj, A, dh_a, nn_model)
+        #all_traj, closests_dist_all, kernel_val_all = propagate_mod_policy_nn(P, q_cur, q_f, dh_params, obs, dt, dt_H,
+        #                                                               N_traj, A, dh_a, nn_model)
+        all_traj, closests_dist_all, kernel_val_all = mppi.propagate()
 
         # Check trajectory for new kernel candidates
         with record_function("kernels candidate check"):
             kernel_candidates = check_traj_for_kernels(all_traj, closests_dist_all, kernel_val_all, thr_dist, thr_rbf)
         if len(kernel_candidates) > 0:
             rand_idx = torch.randint(kernel_candidates.shape[0], (1,))
-            P.add_kernel(kernel_candidates[rand_idx[0]])
+            mppi.P.add_kernel(kernel_candidates[rand_idx[0]])
         # Update current robot state
-        q_cur = all_traj[0, 1, :]
-        cur_fk, _ = numeric_fk_model(q_cur, dh_params, 10)
+        mppi.q_cur = all_traj[0, 1, :]
+        cur_fk, _ = numeric_fk_model(mppi.q_cur, dh_params, 10)
         upd_r_h(cur_fk.to('cpu'), r_h)
 
         # obs[0, 0] += 0.03
         # plot_obs_update(o_h_arr, obs)
         plt.pause(0.0001)
         N_ITER += 1
-        if N_ITER > 1000:
+        if N_ITER > 100:
             break
         # print(q_cur)
         t_iter = time.time() - t_iter
