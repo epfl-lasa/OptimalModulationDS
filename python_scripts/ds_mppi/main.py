@@ -31,6 +31,8 @@ def main_int():
     nn_model = RobotSdfCollisionNet(in_channels=DOF+3, out_channels=DOF, layers=[s] * n_layers, skips=skips)
     nn_model.load_weights('../mlp_learn/models/' + fname, params)
     nn_model.model.to(**params)
+    nn_model.model = torch.jit.script(nn_model.model)
+    nn_model.model = torch.jit.optimize_for_inference(nn_model.model)
 
     # Initial state
     q_0 = torch.zeros(DOF).to(**params)
@@ -52,63 +54,54 @@ def main_int():
     dt_H = 30
     dt = 0.2
     q_cur = q_0
-    # jit warmup
-    for i in range(30):
-        all_traj = propagate_mod(q_cur, q_f, dh_params, obs, dt, 1, 1, A, dh_a)
-
-    t0 = time.time()
     N_ITER = 0
     P = TensorPolicyMPPI(N_traj, DOF, params)
-    # P.add_kernel(q_0)
-    # P.add_kernel(q_0*1.1)
-    # P.add_kernel(q_0*0.9)
+    # kernel adding thresholds
     thr_dist = 1
     thr_rbf = 0.1
-    #all_traj, closests_dist_all, kernel_val_all = propagate_mod_policy_nn(P, q_cur, q_f, dh_params, obs, dt, dt_H,
-    #                                                                   N_traj, A, dh_a, nn_model)
     mppi = MPPI(P, q_0, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a, nn_model)
-    while torch.norm(q_cur - q_f) > 0.1:
-        t_iter = time.time()
-        # Sample random policies
-        mppi.P.sample_policy()
-        # Propagate modulated DS
+    # jit warmup
+    for i in range(30):
+        mppi.propagate()
+    t0 = time.time()
+    #with profile(activities=[ProfilerActivity.CPU], profile_memory=True, record_shapes=True) as prof:
+    with open('.pytest_cache/dummy', 'w') as dummy_file: #that's an empty with statement to replace profining when unused
+        while torch.norm(mppi.q_cur - q_f) > 0.1:
+            t_iter = time.time()
+            # Sample random policies
+            mppi.P.sample_policy()
+            # Propagate modulated DS
 
-        #all_traj, closests_dist_all, kernel_val_all = propagate_mod_policy(P, q_cur, q_f, dh_params, obs, dt, dt_H,
-        #                                                                   N_traj, A, dh_a)
-        #all_traj, closests_dist_all, kernel_val_all = propagate_mod_policy_nn(P, q_cur, q_f, dh_params, obs, dt, dt_H,
-        #                                                               N_traj, A, dh_a, nn_model)
-        all_traj, closests_dist_all, kernel_val_all = mppi.propagate()
+            with record_function("general propagation"):
+                all_traj, closests_dist_all, kernel_val_all = mppi.propagate()
 
-        # Check trajectory for new kernel candidates
-        with record_function("kernels candidate check"):
+            # Check trajectory for new kernel candidates
             kernel_candidates = check_traj_for_kernels(all_traj, closests_dist_all, kernel_val_all, thr_dist, thr_rbf)
-        if len(kernel_candidates) > 0:
-            rand_idx = torch.randint(kernel_candidates.shape[0], (1,))
-            mppi.P.add_kernel(kernel_candidates[rand_idx[0]])
-        # Update current robot state
-        mppi.q_cur = all_traj[0, 1, :]
-        cur_fk, _ = numeric_fk_model(mppi.q_cur, dh_params, 10)
-        upd_r_h(cur_fk.to('cpu'), r_h)
+            if len(kernel_candidates) > 0:
+                rand_idx = torch.randint(kernel_candidates.shape[0], (1,))
+                mppi.P.add_kernel(kernel_candidates[rand_idx[0]])
+            # Update current robot state
+            mppi.q_cur = all_traj[0, 1, :]
+            cur_fk, _ = numeric_fk_model(mppi.q_cur, dh_params, 10)
+            upd_r_h(cur_fk.to('cpu'), r_h)
 
-        # obs[0, 0] += 0.03
-        # plot_obs_update(o_h_arr, obs)
-        plt.pause(0.0001)
-        N_ITER += 1
-        if N_ITER > 100:
-            break
-        # print(q_cur)
-        t_iter = time.time() - t_iter
-        print(f'Iteration:{N_ITER:4d}, Time:{t_iter:4.2f}, Frequency:{1/t_iter:4.2f}')
+            # obs[0, 0] += 0.03
+            # plot_obs_update(o_h_arr, obs)
+            plt.pause(0.0001)
+            N_ITER += 1
+            if N_ITER > 100:
+                break
+            # print(q_cur)
+            t_iter = time.time() - t_iter
+            print(f'Iteration:{N_ITER:4d}, Time:{t_iter:4.2f}, Frequency:{1/t_iter:4.2f}')
     td = time.time() - t0
     print('Time: ', td)
     print('Time per iteration: ', td / N_ITER, 'Hz: ', 1 / (td / N_ITER))
     print('Time per rollout: ', td / (N_ITER * N_traj))
     print('Time per rollout step: ', td / (N_ITER * N_traj * dt_H))
+    #print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))
     plt.pause(1000)
 
 
 if __name__ == '__main__':
-    # with profile(activities=[ProfilerActivity.CPU], profile_memory=True, record_shapes=True) as prof:
-    #     main_int()
-    # print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))
     main_int()
