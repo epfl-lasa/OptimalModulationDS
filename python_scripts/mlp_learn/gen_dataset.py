@@ -28,16 +28,28 @@ rand_jpos = np.random.uniform(q_min, q_max, (N_JPOS, DOF))
 rand_jpos = torch.tensor(rand_jpos).to(**params)
 # compute forward kinematics for pregenerated joint positions
 t0 = time.time()
-all_fk, all_int_pts = numeric_fk_model_vec(rand_jpos, dh_params, 20)
+n_pts_fk = 20
+all_fk, all_int_pts = numeric_fk_model_vec(rand_jpos, dh_params, n_pts_fk)
 # start main loop
-data = torch.zeros(N_JPOS * N_PPOS, DOF + 3 + DOF)  # joint position, point position, distances per link
+data = torch.zeros(N_JPOS * N_PPOS * 2, DOF + 3 + DOF)  # joint position, point position, distances per link
+k = 0
 for i in range(N_JPOS):
     print(i)
     rand_ppos = np.random.uniform(p_min, p_max, (N_PPOS, 3))
     rand_ppos = torch.tensor(rand_ppos).to(**params)
-    for j in range(N_PPOS):
+    n_tiles = int((N_PPOS/DOF*n_pts_fk)+1)
+    link_ppos = all_fk[i].reshape([DOF*n_pts_fk, 3]).tile(n_tiles, 1)
+    link_ppos = link_ppos[:N_PPOS]
+    rnd_near_link = np.random.uniform(0.1*p_min, 0.1*p_max, (link_ppos.shape[0], 3))
+    rand_ppos2 = link_ppos + torch.tensor(rnd_near_link).to(**params)
+    rand_ppos = torch.vstack((rand_ppos, rand_ppos2))
+    for j in range(rand_ppos.shape[0]):
         dist = torch.norm(all_fk[i] - rand_ppos[j], 2, 2)
         res, _ = torch.min(dist, 1)
-        data[i * N_PPOS + j] = torch.hstack((rand_jpos[i], rand_ppos[j], res))
+        data[k] = torch.hstack((rand_jpos[i], rand_ppos[j], res))
+        k = k+1
+data = data[0:k]
 print("time: %4.3f s" % (time.time() - t0))
+
+#res = dist_to_points_vec(all_fk, obs: torch.Tensor) -> torch.Tensor
 torch.save(data, 'datasets/%d_dof_data_test.pt' % DOF)

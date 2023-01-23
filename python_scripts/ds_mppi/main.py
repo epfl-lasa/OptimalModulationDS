@@ -9,6 +9,8 @@ import time
 from policy import *
 import sys, os
 #
+from torch.profiler import profile, record_function, ProfilerActivity
+
 sys.path.append('../mlp_learn/')
 from sdf.robot_sdf import RobotSdfCollisionNet
 
@@ -20,13 +22,13 @@ else:
 
 
 def main_int():
-    DOF = 7
-    L = 1
+    DOF = 2
+    L = 3
     # Load nn model
-    s = 128
-    n_layers = 3
+    s = 256
+    n_layers = 5
     skips = []
-    fname = '%ddof_sdf_128x3_mesh.pt' % (DOF)
+    fname = '%ddof_sdf_%dx%d_mesh.pt' % (DOF, s, n_layers)
     if skips == []:
         n_layers -= 1
     nn_model = RobotSdfCollisionNet(in_channels=DOF+3, out_channels=DOF, layers=[s] * n_layers, skips=skips)
@@ -49,8 +51,8 @@ def main_int():
     o_h_arr = plot_obs_init(obs)
     # Integration parameters
     A = -1 * torch.diag(torch.ones(DOF)).to(**params)
-    N_traj = 100
-    dt_H = 20
+    N_traj = 10
+    dt_H = 30
     dt = 0.2
     q_cur = q_0
     # jit warmup
@@ -63,23 +65,26 @@ def main_int():
     # P.add_kernel(q_0)
     # P.add_kernel(q_0*1.1)
     # P.add_kernel(q_0*0.9)
-    thr_dist = 0.4
-    thr_rbf = 0.2
+    thr_dist = 1
+    thr_rbf = 0.1
     all_traj, closests_dist_all, kernel_val_all = propagate_mod_policy_nn(P, q_cur, q_f, dh_params, obs, dt, dt_H,
                                                                        N_traj, A, dh_a, nn_model)
-
     while torch.norm(q_cur - q_f) > 0.1:
+        t_iter = time.time()
         # Sample random policies
-        P.sample_policy()
+        with record_function("policy sampling"):
+            P.sample_policy()
         # Propagate modulated DS
 
         #all_traj, closests_dist_all, kernel_val_all = propagate_mod_policy(P, q_cur, q_f, dh_params, obs, dt, dt_H,
         #                                                                   N_traj, A, dh_a)
-        all_traj, closests_dist_all, kernel_val_all = propagate_mod_policy_nn(P, q_cur, q_f, dh_params, obs, dt, dt_H,
+        with record_function("propagation general"):
+            all_traj, closests_dist_all, kernel_val_all = propagate_mod_policy_nn(P, q_cur, q_f, dh_params, obs, dt, dt_H,
                                                                            N_traj, A, dh_a, nn_model)
 
         # Check trajectory for new kernel candidates
-        kernel_candidates = check_traj_for_kernels(all_traj, closests_dist_all, kernel_val_all, thr_dist, thr_rbf)
+        with record_function("kernels candidate check"):
+            kernel_candidates = check_traj_for_kernels(all_traj, closests_dist_all, kernel_val_all, thr_dist, thr_rbf)
         if len(kernel_candidates) > 0:
             rand_idx = torch.randint(kernel_candidates.shape[0], (1,))
             P.add_kernel(kernel_candidates[rand_idx[0]])
@@ -95,7 +100,8 @@ def main_int():
         if N_ITER > 1000:
             break
         # print(q_cur)
-        print(N_ITER)
+        t_iter = time.time() - t_iter
+        print(f'Iteration:{N_ITER:4d}, Time:{t_iter:4.2f}, Frequency:{1/t_iter:4.2f}')
     td = time.time() - t0
     print('Time: ', td)
     print('Time per iteration: ', td / N_ITER, 'Hz: ', 1 / (td / N_ITER))
@@ -105,4 +111,7 @@ def main_int():
 
 
 if __name__ == '__main__':
+    # with profile(activities=[ProfilerActivity.CPU], profile_memory=True, record_shapes=True) as prof:
+    #     main_int()
+    # print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))
     main_int()

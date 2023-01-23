@@ -25,6 +25,10 @@ n_pts = 20;
 j_state = [0; 0]+0.1;
 y_pos = [0; 3.5; 0];
 y_r = 1;
+tmp = [ 0.1790, -0.5035,  4.1326, -6.2676,  0.0000];
+j_state = tmp(1:2)';
+y_pos = tmp(3:end)';
+y_r = 0;
 link_num = numeric_fk_model(j_state,r,d,alpha,base, y_pos, n_pts);
 all_state = [j_state; y_pos(1:2); y_r];
 hold on

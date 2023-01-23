@@ -178,11 +178,13 @@ def propagate_mod_policy_nn(P,
         nn_dist -= nn_input[:, -1].unsqueeze(1)
         nn_dist = nn_dist[torch.arange(N_traj).unsqueeze(1), nn_minidx.unsqueeze(1)]
         # get gradients
-        nn_grad = nn_grad.squeeze(2)[:, 0:7]
+        nn_grad = nn_grad.squeeze(2)[:, 0:n_dof]
         distance = nn_dist.squeeze(1)
+        closests_dist_all[:, i - 1] = distance
+
         # all_links, all_int_pts = numeric_fk_model_vec(all_traj[:, i - 1, :], dh_params, 10)
         # distance, idx_obs_closest, idx_links_closest, idx_pts_closest = get_mindist(all_links, obs)
-        # closests_dist_all[:, i - 1] = distance
+        #closests_dist_all[:, i - 1] = distance
         # obs_pos_closest = obs[idx_obs_closest, 0:3].squeeze(1)
         # int_points_closest = all_int_pts[torch.arange(N_traj).unsqueeze(1), idx_links_closest, idx_pts_closest].squeeze(1)
         # rep_vec = lambda_rep_vec(all_traj[:, i - 1, :], obs_pos_closest, idx_links_closest, int_points_closest, dh_a)
@@ -191,7 +193,7 @@ def propagate_mod_policy_nn(P,
         E = tangent_basis_vec(nn_grad)
 
         # calculate standard modulation coefficients
-        gamma = distance + 1 - 0.1
+        gamma = distance + 1 - 0.3
         gamma[gamma < 0] = 1e-8
         l_n = 1 - 1 / gamma
         l_tau = 1 + 1 / gamma
@@ -203,7 +205,7 @@ def propagate_mod_policy_nn(P,
         # build modulation matrix
         M = E @ D @ E.transpose(1, 2)
         # policy control
-        policy_value[policy_value < 1e-8] = 0
+        policy_value[abs(policy_value) < 1e-6] = 0 # to normalize without errors
         policy_value = torch.nan_to_num(policy_value / torch.norm(policy_value, 2, 1).unsqueeze(1))
         policy_velocity = (E[:, :, 1:] @ policy_value.unsqueeze(2)).squeeze(2)
         # calculate modulated vector field (and normalize)

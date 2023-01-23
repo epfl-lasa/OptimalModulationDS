@@ -33,7 +33,7 @@ from sdf.robot_sdf import RobotSdfCollisionNet
 
 device = torch.device('cuda', 0)
 tensor_args = {'device': device, 'dtype': torch.float32}
-q_dof = 7
+q_dof = 2
 data = torch.load('datasets/%d_dof_data.pt' % q_dof).to(**tensor_args)
 data_x = data[:, 0:q_dof + 3]
 data_y = data[:, -q_dof:]
@@ -56,8 +56,8 @@ y_test = data_y[idx_test, :]
 # y[y<0]*=5
 # y[y==0] = 1
 
-s = 128
-n_layers = 3
+s = 256
+n_layers = 5
 skips = []
 fname = '%ddof_sdf_%dx%d_mesh.pt' % (q_dof, s, n_layers)
 if skips == []:

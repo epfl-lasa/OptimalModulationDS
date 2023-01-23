@@ -2,6 +2,7 @@ import torch
 from fk_num import *
 from fk_sym_gen import *
 import time
+from torch.profiler import profile, record_function, ProfilerActivity
 
 
 # Class defining MPPI policy for placing RBF kernels in the state space
@@ -25,7 +26,7 @@ class TensorPolicyMPPI:
         # Policy sigmas
         self.mu_s = torch.tensor(0, **self.params)
         self.sigma_s = torch.tensor(0, **self.params)
-        self.alpha_s = torch.tensor(0.3, **self.params)
+        self.alpha_s = torch.tensor(0.5, **self.params)
         # sampled policy
         self.mu_tmp = torch.zeros((self.n_traj, self.N_KERNEL_MAX, self.n_dof), **self.params)
         self.sigma_tmp = torch.zeros((self.n_traj, self.N_KERNEL_MAX), **self.params)
@@ -116,20 +117,22 @@ def check_traj_for_kernels(all_traj, closests_dist_all, kernel_val_all, thr_dist
 
 
 if __name__ == '__main__':
-    dof = 2
-    n_traj = 5
-    tens_args = {'device': 'cpu', 'dtype': torch.float32}
-    P = TensorPolicyMPPI(n_traj, dof, tens_args)
-    t0 = time.time()
-    torch.manual_seed(0)
-    for i in range(1000):
-        P.add_kernel(torch.tensor([i / 100, i / 100], **tens_args))
-        P.sample_policy()
-        w_tmp = torch.arange(0, 1, 1 / n_traj, **tens_args)
-        w_tmp = (w_tmp / sum(w_tmp)).flip(0)
-        P.update_policy(w_tmp, 0.1)
-    print(P.mu_c.shape)
-    print(P.sigma_c.shape)
-    print(P.alpha_c.shape)
+    with profile(activities=[ProfilerActivity.CPU], profile_memory=True, record_shapes=True) as prof:
+        dof = 2
+        n_traj = 50
+        tens_args = {'device': 'cuda:0', 'dtype': torch.float32}
+        P = TensorPolicyMPPI(n_traj, dof, tens_args)
+        t0 = time.time()
+        torch.manual_seed(0)
+        for i in range(100):
+            P.add_kernel(torch.tensor([i / 100, i / 100], **tens_args))
+            P.sample_policy()
+            w_tmp = torch.arange(0, 1, 1 / n_traj, **tens_args)
+            w_tmp = (w_tmp / sum(w_tmp)).flip(0)
+            P.update_policy(w_tmp, 0.1)
+        print(P.mu_c.shape)
+        print(P.sigma_c.shape)
+        print(P.alpha_c.shape)
+        print(time.time() - t0, 'sec')
 
-    print(time.time() - t0, 'sec')
+    print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))

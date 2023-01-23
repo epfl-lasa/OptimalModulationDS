@@ -4,9 +4,9 @@ import numpy as np
 import time
 from sdf.robot_sdf import RobotSdfCollisionNet
 
-tensor_args = {'device': 'cuda:0', 'dtype': torch.float32}
+tensor_args = {'device': 'cpu:0', 'dtype': torch.float32}
 
-q_dof = 7
+q_dof = 2
 data = torch.load('datasets/%d_dof_data_test.pt' % q_dof).to(**tensor_args)
 x = data[:, 0:q_dof + 3]
 y = data[:, -q_dof:]
