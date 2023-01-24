@@ -6,8 +6,10 @@ from torch.nn import Sequential as Seq, Linear as Lin, ReLU, ELU, ReLU6, Tanh
 #from .network_macros_mod import MLPRegression, scale_to_base, scale_to_net
 from .network_macros_mod import *
 #from .util_file import *
-#from functorch import vmap, jacrev
+from functorch import vmap, jacrev
 #from functorch.compile import aot_function
+from functools import partial
+from functorch import vmap, vjp
 
 
 class RobotSdfCollisionNet():
@@ -108,6 +110,40 @@ class RobotSdfCollisionNet():
                     for param in self.model.parameters():
                         param.grad = None
         return dist_scale.detach(), grads.detach(), minidxMask.detach()
+
+    def allocate_gradients(self, N, tensor_args):
+        self.grads = torch.zeros((N, 10, 1)).to(**tensor_args)
+        self.grd = torch.zeros((N, self.out_channels)).to(**tensor_args)
+
+    def dist_grad_closest(self, q):
+        minidxMask = torch.zeros(q.shape[0])
+        self.grd = self.grd * 0
+        self.grads = self.grads * 0
+        with torch.enable_grad():
+            #https://discuss.pytorch.org/t/derivative-of-model-outputs-w-r-t-input-features/95814/2
+            q.requires_grad = True
+            q.grad = None
+            #removed scaling as we don't use it
+            dist_scale = self.model.forward(q)
+            minidxMask = torch.argmin(dist_scale, dim=1)
+            #self.grd = torch.zeros((q.shape[0], self.out_channels), device = q.device, dtype = q.dtype) # same shape as preds
+            #self.grads = torch.zeros((q.shape[0], q.shape[1], 1), device = q.device, dtype = q.dtype)
+            self.grd[list(range(q.shape[0])), minidxMask] = 1
+            dist_scale.backward(gradient=self.grd, retain_graph=False)
+            self.grads[:, :, 0] = q.grad  # fill in one column of Jacobian
+            #q.grad.zero_()  # .backward() accumulates gradients, so reset to zero
+            for param in self.model.parameters():
+                param.grad = None
+        return dist_scale.detach(), self.grads.detach(), minidxMask.detach()
+
+
+    def compute_signed_distance_wgrad2(self, q):
+        grad_map = torch.zeros(7, q.shape[0], 7, device = q.device, dtype = q.dtype)
+        dists, vjp_fn = vjp(partial(self.model.forward), q)
+        minidxMask = torch.argmin(dists, dim=1)
+        grad_map[minidxMask, list(range(q.shape[0])), minidxMask] = 1
+        ft_jacobian = (vmap(vjp_fn)(grad_map))[0].sum(0)
+        return dists.detach(), ft_jacobian.detach(), minidxMask.detach()
 
     # def functorch_jacobian(self, points):
     #     """calculate a jacobian tensor along a batch of inputs. returns something of size

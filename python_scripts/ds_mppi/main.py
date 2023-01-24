@@ -1,5 +1,7 @@
 from propagation import *
 import sys
+import cProfile
+import pstats
 
 #
 from torch.profiler import record_function
@@ -14,16 +16,17 @@ from sdf.robot_sdf import RobotSdfCollisionNet
 if 0:
     params = {'device': 'cpu', 'dtype': torch.float32}
 else:
-    params = {'device': 'cuda:0', 'dtype': torch.float32}
+    params = {'device': 'cuda:0', 'dtype': torch.float16}
 
 
 def main_int():
+    t00 = time.time()
     DOF = 7
     L = 1
 
     # Load nn model
-    s = 128
-    n_layers = 3
+    s = 256
+    n_layers = 5
     skips = []
     fname = '%ddof_sdf_%dx%d_mesh.pt' % (DOF, s, n_layers)
     if skips == []:
@@ -51,7 +54,7 @@ def main_int():
     # Integration parameters
     A = -1 * torch.diag(torch.ones(DOF)).to(**params)
     N_traj = 100
-    dt_H = 30
+    dt_H = 10
     dt = 0.2
     q_cur = q_0
     N_ITER = 0
@@ -61,9 +64,13 @@ def main_int():
     thr_rbf = 0.1
     mppi = MPPI(P, q_0, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a, nn_model)
     # jit warmup
-    for i in range(30):
+    for i in range(20):
         mppi.propagate()
     t0 = time.time()
+    print('Init time: %4.2fs' % (t0 - t00))
+    #prof = cProfile.Profile()
+    #prof.enable()
+
     #with profile(activities=[ProfilerActivity.CPU], profile_memory=True, record_shapes=True) as prof:
     with open('.pytest_cache/dummy', 'w') as dummy_file: #that's an empty with statement to replace profining when unused
         while torch.norm(mppi.q_cur - q_f) > 0.1:
@@ -89,18 +96,22 @@ def main_int():
             # plot_obs_update(o_h_arr, obs)
             plt.pause(0.0001)
             N_ITER += 1
-            if N_ITER > 100:
+            if N_ITER > 1000:
                 break
             # print(q_cur)
             t_iter = time.time() - t_iter
-            print(f'Iteration:{N_ITER:4d}, Time:{t_iter:4.2f}, Frequency:{1/t_iter:4.2f}')
+            print(f'Iteration:{N_ITER:4d}, Time:{t_iter:4.2f}, Frequency:{1/t_iter:4.2f},'
+                  f' Avg. frequency:{N_ITER/(time.time()-t0):4.2f}')
     td = time.time() - t0
+    #prof.disable()
+    #stats = pstats.Stats(prof).strip_dirs().sort_stats("cumtime")
+    #stats.print_stats(20)
     print('Time: ', td)
     print('Time per iteration: ', td / N_ITER, 'Hz: ', 1 / (td / N_ITER))
     print('Time per rollout: ', td / (N_ITER * N_traj))
     print('Time per rollout step: ', td / (N_ITER * N_traj * dt_H))
     #print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))
-    plt.pause(1000)
+    plt.pause(10)
 
 
 if __name__ == '__main__':

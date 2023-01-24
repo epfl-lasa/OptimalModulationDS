@@ -83,13 +83,15 @@ class MPPI:
                 self.nn_grad = nn_grad.squeeze(2)[:, 0:self.n_dof]
                 distance = nn_dist.squeeze(1)
                 self.closest_dist_all[:, i - 1] = distance
-            with record_function("modulations"):
+            with record_function("QR"):
                 # calculate modulations
                 self.basis_eye_temp = self.basis_eye_temp*0 + self.basis_eye
                 self.basis_eye_temp[:, :, 0] = self.nn_grad
                 # QR decomposition
-                E, R = torch.linalg.qr(self.basis_eye_temp)
+                E, R = torch.linalg.qr(self.basis_eye_temp.to(torch.float32))
                 E[:, :, 0] = self.nn_grad / self.nn_grad.norm(2, 1).unsqueeze(1)
+                E = E.to(**self.tensor_args)
+            with record_function("Modulation-propagation"):
                 # calculate standard modulation coefficients
                 gamma = distance + 1 - 0.3
                 gamma[gamma < 0] = 1e-8
