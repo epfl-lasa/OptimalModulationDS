@@ -47,22 +47,24 @@ def main_int():
     dh_a[1:] = L  # link length
     dh_params = torch.vstack((dh_a * 0, dh_a * 0, dh_a, dh_a * 0)).T
     # Obstacle spheres (x, y, z, r)
-    obs = torch.tensor([[5, 0, 0, 1], [5, -2, 0, 1],  [5, -3, 0, 0.3]]).to(**params)
+    obs = torch.tensor([[3, 3, 0, .3],
+                        [5, 0, 0, .3],
+                        [3, -3, 0, .3]]).to(**params)
     # Plotting
     r_h = init_robot_plot(dh_params, -10, 10, -10, 10)
     o_h_arr = plot_obs_init(obs)
     # Integration parameters
     A = -1 * torch.diag(torch.ones(DOF)).to(**params)
-    N_traj = 100
-    dt_H = 20
+    N_traj = 50
+    dt_H = 30
     dt = 0.2
     q_cur = q_0
     N_ITER = 0
-    P = TensorPolicyMPPI(N_traj, DOF, params)
     # kernel adding thresholds
     thr_dist = 1
     thr_rbf = 0.1
     mppi = MPPI(q_0, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a, nn_model)
+
     # jit warmup
     for i in range(50):
         a,b,c = mppi.propagate()

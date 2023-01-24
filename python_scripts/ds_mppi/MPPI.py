@@ -52,7 +52,7 @@ class MPPI:
         self.basis_eye_temp = (self.basis_eye * 0).to(**self.tensor_args)
         self.nn_model.allocate_gradients(self.N_traj, self.tensor_args)
         self.Cost = Cost(self.qf)
-
+        self.traj_range = torch.arange(self.N_traj).to(**self.tensor_args).to(torch.long)
     def reset_tensors(self):
         self.all_traj = self.all_traj * 0
         self.closest_dist_all = 100 + self.closest_dist_all * 0
@@ -82,13 +82,14 @@ class MPPI:
                 # evaluate NN
                 nn_input = self.build_nn_input(q_prev, self.obs)
                 nn_dist = self.nn_model.model.forward(nn_input[:, 0:-1])
+                nn_dist -= nn_input[:, -1].unsqueeze(1) # subtract radius
                 mindist, _ = nn_dist.min(1)
                 mindist, sphere_idx = mindist.reshape(self.n_obs, self.N_traj).transpose(0, 1).min(1)
-                mask_idx = torch.arange(self.N_traj) + sphere_idx * self.N_traj
+                mask_idx = self.traj_range + sphere_idx * self.N_traj
                 nn_input = nn_input[mask_idx, :]
                 #nn_dist, nn_grad, nn_minidx = self.nn_model.compute_signed_distance_wgrad(nn_input[:, 0:-1], 'closest')
                 nn_dist, nn_grad, nn_minidx = self.nn_model.dist_grad_closest(nn_input[:, 0:-1])
-                nn_dist -= nn_input[:, -1].unsqueeze(1) + 0.4 # subtract radius and some threshold
+                nn_dist -= nn_input[:, -1].unsqueeze(1) + 0.2 # subtract radius and some threshold
                 nn_dist = nn_dist[torch.arange(self.N_traj).unsqueeze(1), nn_minidx.unsqueeze(1)]
                 # get gradients
                 self.nn_grad = nn_grad.squeeze(2)[:, 0:self.n_dof]
@@ -144,5 +145,5 @@ class MPPI:
         beta = self.cur_cost.mean() / 50
         w = torch.exp(-1 / beta * self.cur_cost)
         w = w / w.sum()
-        self.Policy.update_policy(w, 0.1)
+        self.Policy.update_policy(w, 0.5)
         return 0

@@ -7,7 +7,7 @@ class Cost:
         goal_cost = self.goal_cost(all_traj[:, -1, :], self.qf)
         collision_cost = 500 * self.collision_cost(closest_dist_all)
         joint_limits_cost = 500 * self.joint_limits_cost(all_traj)
-        stagnation_cost = 100 * goal_cost * self.stagnation_cost(all_traj)
+        stagnation_cost = 300 * goal_cost * self.stagnation_cost(all_traj)
         total_cost = goal_cost + collision_cost + joint_limits_cost + stagnation_cost
         return total_cost
 

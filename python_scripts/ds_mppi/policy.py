@@ -17,7 +17,7 @@ class TensorPolicyMPPI:
         self.params = tensor_params
         self.n_kernels = 0
         self.N_KERNEL_MAX = 1000  # Maximum number of kernels
-        self.sigma_c_nominal = 0.1  # Nominal standard deviation of RBF kernels
+        self.sigma_c_nominal = 0.2  # Nominal standard deviation of RBF kernels
         # Policy centers
         self.mu_c = torch.zeros((self.N_KERNEL_MAX, self.n_dof), **self.params)  # Centers of RBF kernels
         self.sigma_c = torch.zeros((self.N_KERNEL_MAX), **self.params)  # Standard deviations of RBF kernels
