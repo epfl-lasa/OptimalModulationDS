@@ -13,10 +13,10 @@ sys.path.append('../mlp_learn/')
 from sdf.robot_sdf import RobotSdfCollisionNet
 
 # define tensor parameters (cpu or cuda:0)
-if 0:
+if 1:
     params = {'device': 'cpu', 'dtype': torch.float32}
 else:
-    params = {'device': 'cuda:0', 'dtype': torch.float16}
+    params = {'device': 'cuda:0', 'dtype': torch.float32}
 
 
 def main_int():
@@ -47,7 +47,7 @@ def main_int():
     dh_a[1:] = L  # link length
     dh_params = torch.vstack((dh_a * 0, dh_a * 0, dh_a, dh_a * 0)).T
     # Obstacle spheres (x, y, z, r)
-    obs = torch.tensor([[6, 0, 0, 1]]).to(**params)
+    obs = torch.tensor([[4, 0, 0, 1]]).to(**params)
     # Plotting
     r_h = init_robot_plot(dh_params, -10, 10, -10, 10)
     o_h_arr = plot_obs_init(obs)
@@ -62,10 +62,10 @@ def main_int():
     # kernel adding thresholds
     thr_dist = 1
     thr_rbf = 0.1
-    mppi = MPPI(P, q_0, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a, nn_model)
+    mppi = MPPI(q_0, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a, nn_model)
     # jit warmup
-    for i in range(20):
-        mppi.propagate()
+    for i in range(50):
+        a,b,c = mppi.propagate()
     t0 = time.time()
     print('Init time: %4.2fs' % (t0 - t00))
     #prof = cProfile.Profile()
@@ -76,19 +76,25 @@ def main_int():
         while torch.norm(mppi.q_cur - q_f) > 0.1:
             t_iter = time.time()
             # Sample random policies
-            mppi.P.sample_policy()
+            mppi.Policy.sample_policy()
             # Propagate modulated DS
 
             with record_function("general propagation"):
                 all_traj, closests_dist_all, kernel_val_all = mppi.propagate()
 
-            # Check trajectory for new kernel candidates
+            with record_function("cost calculation"):
+                # Calculate cost
+                cost = mppi.get_cost()
+                best_idx = torch.argmin(cost)
+                mppi.shift_policy_means()
+            # Check trajectory for new kernel candidates and add policy kernels
             kernel_candidates = check_traj_for_kernels(all_traj, closests_dist_all, kernel_val_all, thr_dist, thr_rbf)
             if len(kernel_candidates) > 0:
                 rand_idx = torch.randint(kernel_candidates.shape[0], (1,))
-                mppi.P.add_kernel(kernel_candidates[rand_idx[0]])
+                mppi.Policy.add_kernel(kernel_candidates[rand_idx[0]])
+
             # Update current robot state
-            mppi.q_cur = all_traj[0, 1, :]
+            mppi.q_cur = all_traj[best_idx, 1, :]
             cur_fk, _ = numeric_fk_model(mppi.q_cur, dh_params, 10)
             upd_r_h(cur_fk.to('cpu'), r_h)
 

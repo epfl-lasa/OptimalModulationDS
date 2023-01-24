@@ -1,4 +1,5 @@
 from policy import *
+from cost import *
 import sys
 
 #@torch.jit.script
@@ -23,10 +24,11 @@ def tangent_basis_tens(normal_tens):
     return Q.nan_to_num()
 
 class MPPI:
-    def __init__(self, P, q0: torch.Tensor, qf: torch.Tensor, dh_params: torch.Tensor, obs: torch.Tensor, dt: float,
+    def __init__(self, q0: torch.Tensor, qf: torch.Tensor, dh_params: torch.Tensor, obs: torch.Tensor, dt: float,
              dt_H: int, N_traj: int, A: torch.Tensor, dh_a: torch.Tensor, nn_model):
         self.tensor_args = {'device': q0.device, 'dtype': q0.dtype}
-        self.P = P
+        self.n_dof = q0.shape[0]
+        self.Policy = TensorPolicyMPPI(N_traj, self.n_dof, self.tensor_args)
         self.q0 = q0
         self.qf = qf
         self.dh_params = dh_params
@@ -37,10 +39,9 @@ class MPPI:
         self.A = A
         self.dh_a = dh_a
         self.nn_model = nn_model
-        self.n_dof = q0.shape[0]
         self.all_traj = torch.zeros(N_traj, dt_H, self.n_dof).to(**self.tensor_args)
         self.closest_dist_all = 100 + torch.zeros(N_traj, dt_H).to(**self.tensor_args)
-        self.kernel_val_all = torch.zeros(N_traj, dt_H, P.N_KERNEL_MAX).to(**self.tensor_args)
+        self.kernel_val_all = torch.zeros(N_traj, dt_H, self.Policy.N_KERNEL_MAX).to(**self.tensor_args)
         self.q_cur = q0
         self.nn_input = torch.zeros(N_traj * obs.shape[0], self.n_dof + 3).to(**self.tensor_args)
         self.D = (torch.zeros([self.N_traj, self.n_dof, self.n_dof]) + torch.eye(self.n_dof)).to(**self.tensor_args)
@@ -48,6 +49,9 @@ class MPPI:
         self.norm_basis = torch.zeros((self.N_traj, self.n_dof, self.n_dof)).to(**self.tensor_args)
         self.basis_eye = torch.eye(self.n_dof).repeat(N_traj, 1).reshape(N_traj, self.n_dof, self.n_dof).to(**self.tensor_args)
         self.basis_eye_temp = (self.basis_eye * 0).to(**self.tensor_args)
+        self.nn_model.allocate_gradients(self.N_traj, self.tensor_args)
+        self.Cost = Cost(self.qf)
+
     def reset_tensors(self):
         self.all_traj = self.all_traj * 0
         self.closest_dist_all = 100 + self.closest_dist_all * 0
@@ -60,7 +64,7 @@ class MPPI:
     def propagate(self):
         self.reset_tensors()
         self.all_traj[:, 0, :] = self.q_cur
-        P = self.P
+        P = self.Policy
         for i in range(1, self.dt_H):
             with record_function("nominal vector field"):
                 q_cur = self.all_traj[:, i, :]
@@ -76,7 +80,8 @@ class MPPI:
             with record_function("evaluate NN"):
                 # evaluate NN
                 nn_input = self.build_nn_input(q_prev, self.obs)
-                nn_dist, nn_grad, nn_minidx = self.nn_model.compute_signed_distance_wgrad(nn_input[:, 0:-1], 'closest')
+                #nn_dist, nn_grad, nn_minidx = self.nn_model.compute_signed_distance_wgrad(nn_input[:, 0:-1], 'closest')
+                nn_dist, nn_grad, nn_minidx = self.nn_model.dist_grad_closest(nn_input[:, 0:-1])
                 nn_dist -= nn_input[:, -1].unsqueeze(1) # subtract radius
                 nn_dist = nn_dist[torch.arange(self.N_traj).unsqueeze(1), nn_minidx.unsqueeze(1)]
                 # get gradients
@@ -125,3 +130,13 @@ class MPPI:
         return self.all_traj, self.closest_dist_all, self.kernel_val_all[:, :, 0:P.n_kernels]
 
 
+    def get_cost(self):
+        self.cur_cost = self.Cost.evaluate_costs(self.all_traj, self.closest_dist_all)
+        return self.cur_cost
+
+    def shift_policy_means(self):
+        beta = self.cur_cost.mean() / 50
+        w = torch.exp(-1 / beta * self.cur_cost)
+        w = w / w.sum()
+        self.Policy.update_policy(w, 0.1)
+        return 0

@@ -18,14 +18,14 @@ class RobotSdfCollisionNet():
 
         super().__init__()
         act_fn = ReLU
-        in_channels = in_channels
+        self.in_channels = in_channels
         self.out_channels = out_channels
         dropout_ratio = 0
         mlp_layers = layers
-        self.model = MLPRegression(in_channels, self.out_channels, mlp_layers, skips, act_fn=act_fn, nerf=True)
+        self.model = MLPRegression(self.in_channels, self.out_channels, mlp_layers, skips, act_fn=act_fn, nerf=True)
         self.m = torch.zeros((500, 1)).to('cuda:0')
         self.m[:, 0] = 1
-        self.order = list(range(out_channels))
+        self.order = list(range(self.out_channels))
 
     def set_link_order(self, order):
         self.order = order
@@ -112,7 +112,7 @@ class RobotSdfCollisionNet():
         return dist_scale.detach(), grads.detach(), minidxMask.detach()
 
     def allocate_gradients(self, N, tensor_args):
-        self.grads = torch.zeros((N, 10, 1)).to(**tensor_args)
+        self.grads = torch.zeros((N, self.in_channels, 1)).to(**tensor_args)
         self.grd = torch.zeros((N, self.out_channels)).to(**tensor_args)
 
     def dist_grad_closest(self, q):
