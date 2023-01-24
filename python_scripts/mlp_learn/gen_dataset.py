@@ -10,7 +10,7 @@ import time
 
 params = {'device': 'cpu', 'dtype': torch.float32}
 # robot DH parameters
-dh_a = torch.tensor([0, 1, 1, 1, 1, 1])
+dh_a = torch.tensor([0, 1, 1, 1, 1, 1, 1, 1])
 dh_params = torch.vstack((dh_a * 0, dh_a * 0, dh_a, dh_a * 0)).T.to(**params)
 
 DOF = len(dh_a) - 1
@@ -21,8 +21,8 @@ p_min = np.array([-10, -10, 0])
 p_max = np.array([10, 10, 0])
 
 # number of samples
-N_JPOS = 100
-N_PPOS = 100
+N_JPOS = 4000
+N_PPOS = 500
 # generate random joint positions
 rand_jpos = np.random.uniform(q_min, q_max, (N_JPOS, DOF))
 rand_jpos = torch.tensor(rand_jpos).to(**params)
@@ -52,4 +52,4 @@ data = data[0:k]
 print("time: %4.3f s" % (time.time() - t0))
 
 #res = dist_to_points_vec(all_fk, obs: torch.Tensor) -> torch.Tensor
-torch.save(data, 'datasets/%d_dof_data_test.pt' % DOF)
+torch.save(data, 'datasets/%d_dof_data.pt' % DOF)

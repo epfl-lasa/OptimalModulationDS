@@ -11,8 +11,8 @@ data = torch.load('datasets/%d_dof_data_test.pt' % q_dof).to(**tensor_args)
 x = data[:, 0:q_dof + 3]
 y = data[:, -q_dof:]
 
-s = 128
-n_layers = 3
+s = 256
+n_layers = 5
 skips = []
 fname = '%ddof_sdf_%dx%d_mesh.pt' % (q_dof, s, n_layers)
 if skips == []:
@@ -37,10 +37,10 @@ print(t1 - t0)
 print("Time per sample: %4.10f" % ((t1 - t0) / (N_REP * x.shape[0])))
 # print(y_pred.shape, y_test.shape)
 loss = F.l1_loss(y_pred, y, reduction='mean')
-print(torch.median(y_pred), torch.mean(y_pred))
-print(loss.item())
+#print(torch.median(y_pred), torch.mean(y_pred))
+#print(loss.item())
 dist_dif = torch.abs(y_pred - y)
 print('Mean distance difference: ', dist_dif.mean(dim=0))
 print('Mean distance std: ', dist_dif.std(dim=0))
-a = nn_model.compute_signed_distance_wgrad(x, 'mindist')
-print(a)
+#a = nn_model.compute_signed_distance_wgrad(x, 'mindist')
+#print(a)

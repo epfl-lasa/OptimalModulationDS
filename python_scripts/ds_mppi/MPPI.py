@@ -46,8 +46,8 @@ class MPPI:
         self.D = (torch.zeros([self.N_traj, self.n_dof, self.n_dof]) + torch.eye(self.n_dof)).to(**self.tensor_args)
         self.nn_grad = torch.zeros(N_traj, self.n_dof).to(**self.tensor_args)
         self.norm_basis = torch.zeros((self.N_traj, self.n_dof, self.n_dof)).to(**self.tensor_args)
-        self.basis_eye = torch.eye(2).repeat(N_traj, 1).reshape(N_traj, self.n_dof, self.n_dof)
-        self.basis_eye_temp = self.basis_eye * 0
+        self.basis_eye = torch.eye(self.n_dof).repeat(N_traj, 1).reshape(N_traj, self.n_dof, self.n_dof).to(**self.tensor_args)
+        self.basis_eye_temp = (self.basis_eye * 0).to(**self.tensor_args)
     def reset_tensors(self):
         self.all_traj = self.all_traj * 0
         self.closest_dist_all = 100 + self.closest_dist_all * 0
@@ -99,7 +99,7 @@ class MPPI:
                 l_tau[l_tau < 1] = 1
                 # self.D = self.D * 0 + torch.eye(self.n_dof).to(**self.tensor_args)
                 # self.D = l_tau[:, None, None] * self.D
-                self.D = l_tau.repeat_interleave(self.n_dof).reshape((self.N_traj, 2)).diag_embed(0, 1, 2)
+                self.D = l_tau.repeat_interleave(self.n_dof).reshape((self.N_traj, self.n_dof)).diag_embed(0, 1, 2)
                 self.D[:, 0, 0] = l_n
                 # build modulation matrix
                 M = E @ self.D @ E.transpose(1, 2)

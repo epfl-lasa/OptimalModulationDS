@@ -11,19 +11,19 @@ sys.path.append('../mlp_learn/')
 from sdf.robot_sdf import RobotSdfCollisionNet
 
 # define tensor parameters (cpu or cuda:0)
-if 1:
+if 0:
     params = {'device': 'cpu', 'dtype': torch.float32}
 else:
     params = {'device': 'cuda:0', 'dtype': torch.float32}
 
 
 def main_int():
-    DOF = 2
-    L = 3
+    DOF = 7
+    L = 1
 
     # Load nn model
-    s = 256
-    n_layers = 5
+    s = 128
+    n_layers = 3
     skips = []
     fname = '%ddof_sdf_%dx%d_mesh.pt' % (DOF, s, n_layers)
     if skips == []:
@@ -50,7 +50,7 @@ def main_int():
     o_h_arr = plot_obs_init(obs)
     # Integration parameters
     A = -1 * torch.diag(torch.ones(DOF)).to(**params)
-    N_traj = 10
+    N_traj = 100
     dt_H = 30
     dt = 0.2
     q_cur = q_0
