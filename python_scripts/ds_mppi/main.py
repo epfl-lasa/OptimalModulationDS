@@ -34,8 +34,8 @@ def main_int():
     nn_model = RobotSdfCollisionNet(in_channels=DOF+3, out_channels=DOF, layers=[s] * n_layers, skips=skips)
     nn_model.load_weights('../mlp_learn/models/' + fname, params)
     nn_model.model.to(**params)
-    nn_model.model = torch.jit.script(nn_model.model)
-    nn_model.model = torch.jit.optimize_for_inference(nn_model.model)
+    # nn_model.model = torch.jit.script(nn_model.model)
+    # nn_model.model = torch.jit.optimize_for_inference(nn_model.model)
 
     # Initial state
     q_0 = torch.zeros(DOF).to(**params)
@@ -47,14 +47,14 @@ def main_int():
     dh_a[1:] = L  # link length
     dh_params = torch.vstack((dh_a * 0, dh_a * 0, dh_a, dh_a * 0)).T
     # Obstacle spheres (x, y, z, r)
-    obs = torch.tensor([[4, 0, 0, 1]]).to(**params)
+    obs = torch.tensor([[5, 0, 0, 1], [5, -2, 0, 1],  [5, -3, 0, 0.3]]).to(**params)
     # Plotting
     r_h = init_robot_plot(dh_params, -10, 10, -10, 10)
     o_h_arr = plot_obs_init(obs)
     # Integration parameters
     A = -1 * torch.diag(torch.ones(DOF)).to(**params)
     N_traj = 100
-    dt_H = 10
+    dt_H = 20
     dt = 0.2
     q_cur = q_0
     N_ITER = 0

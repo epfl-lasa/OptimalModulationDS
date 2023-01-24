@@ -33,6 +33,7 @@ class MPPI:
         self.qf = qf
         self.dh_params = dh_params
         self.obs = obs
+        self.n_obs = obs.shape[0]
         self.dt = dt
         self.dt_H = dt_H
         self.N_traj = N_traj
@@ -80,9 +81,14 @@ class MPPI:
             with record_function("evaluate NN"):
                 # evaluate NN
                 nn_input = self.build_nn_input(q_prev, self.obs)
+                nn_dist = self.nn_model.model.forward(nn_input[:, 0:-1])
+                mindist, _ = nn_dist.min(1)
+                mindist, sphere_idx = mindist.reshape(self.n_obs, self.N_traj).transpose(0, 1).min(1)
+                mask_idx = torch.arange(self.N_traj) + sphere_idx * self.N_traj
+                nn_input = nn_input[mask_idx, :]
                 #nn_dist, nn_grad, nn_minidx = self.nn_model.compute_signed_distance_wgrad(nn_input[:, 0:-1], 'closest')
                 nn_dist, nn_grad, nn_minidx = self.nn_model.dist_grad_closest(nn_input[:, 0:-1])
-                nn_dist -= nn_input[:, -1].unsqueeze(1) # subtract radius
+                nn_dist -= nn_input[:, -1].unsqueeze(1) + 0.4 # subtract radius and some threshold
                 nn_dist = nn_dist[torch.arange(self.N_traj).unsqueeze(1), nn_minidx.unsqueeze(1)]
                 # get gradients
                 self.nn_grad = nn_grad.squeeze(2)[:, 0:self.n_dof]
