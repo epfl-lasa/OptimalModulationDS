@@ -13,11 +13,10 @@ sys.path.append('../mlp_learn/')
 from sdf.robot_sdf import RobotSdfCollisionNet
 
 # define tensor parameters (cpu or cuda:0)
-if 0:
+if 1:
     params = {'device': 'cpu', 'dtype': torch.float32}
 else:
     params = {'device': 'cuda:0', 'dtype': torch.float32}
-
 
 # trace_handler for pytorch profiling
 def trace_handler(profiler):
@@ -75,11 +74,12 @@ def main_int():
         a,b,c = mppi.propagate()
     t0 = time.time()
     print('Init time: %4.2fs' % (t0 - t00))
-    with profile(schedule=torch.profiler.schedule(wait=10, warmup=1, active=1, repeat=1),
+    PROFILING = True
+    with profile(schedule=torch.profiler.schedule(wait=10 if PROFILING else 1e10, warmup=1, active=3, repeat=1),
                  activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
                  on_trace_ready=trace_handler,
                  profile_memory=True, record_shapes=True, with_stack=True) as torch_profiler:
-    #with open('.pytest_cache/dummy', 'w') as dummy_file: #that's an empty with statement to replace profining when unused
+    # with open('.pytest_cache/dummy', 'w') as dummy_file: #that's an empty with statement to replace profining when unused
         while torch.norm(mppi.q_cur - q_f) > 0.1:
             t_iter = time.time()
             # Sample random policies
@@ -108,7 +108,8 @@ def main_int():
             # plot_obs_update(o_h_arr, obs)
             plt.pause(0.0001)
             N_ITER += 1
-            torch_profiler.step()
+            if PROFILING:
+                torch_profiler.step()
             if N_ITER > 100:
                 break
             # print(q_cur)
