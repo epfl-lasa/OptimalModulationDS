@@ -13,7 +13,7 @@ sys.path.append('../mlp_learn/')
 from sdf.robot_sdf import RobotSdfCollisionNet
 
 # define tensor parameters (cpu or cuda:0)
-if 1:
+if 0:
     params = {'device': 'cpu', 'dtype': torch.float32}
 else:
     params = {'device': 'cuda:0', 'dtype': torch.float32}
@@ -21,7 +21,7 @@ else:
 # trace_handler for pytorch profiling
 def trace_handler(profiler):
     print(profiler.key_averages().table(sort_by="cpu_time_total", row_limit=20))
-
+    profiler.export_chrome_trace("trace_GPU.json")
 
 def main_int():
     t00 = time.time()
@@ -75,7 +75,7 @@ def main_int():
     t0 = time.time()
     print('Init time: %4.2fs' % (t0 - t00))
     PROFILING = True
-    with profile(schedule=torch.profiler.schedule(wait=10 if PROFILING else 1e10, warmup=1, active=3, repeat=1),
+    with profile(schedule=torch.profiler.schedule(wait=10 if PROFILING else 1e10, warmup=1, active=10, repeat=1),
                  activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
                  on_trace_ready=trace_handler,
                  profile_memory=True, record_shapes=True, with_stack=True) as torch_profiler:

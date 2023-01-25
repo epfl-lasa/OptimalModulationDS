@@ -80,15 +80,15 @@ class MPPI:
                     self.kernel_val_all[:, i - 1, 0:P.n_kernels] = kernel_value.reshape((self.N_traj, P.n_kernels))
             with record_function("TAG: evaluate NN"):
                 # evaluate NN
-                with record_function("TAG: evaluate NN_1"):
+                with record_function("TAG: evaluate NN_1 (build input)"):
                     # building input tensor for NN (N_traj * n_obs, n_dof + 3)
                     nn_input = self.build_nn_input(q_prev, self.obs)
 
-                with record_function("TAG: evaluate NN_2"):
+                with record_function("TAG: evaluate NN_2 (forward pass)"):
                     # doing single forward pass to figure out the closest obstacle for each configuration
                     nn_dist = self.nn_model.model.forward(nn_input[:, 0:-1])
 
-                with record_function("TAG: evaluate NN_3"):
+                with record_function("TAG: evaluate NN_3 (get closest obstacle)"):
                     # rebuilding input tensor to only include closest obstacles
                     nn_dist -= nn_input[:, -1].unsqueeze(1) # subtract radius
                     mindist, _ = nn_dist.min(1)
@@ -96,12 +96,12 @@ class MPPI:
                     mask_idx = self.traj_range + sphere_idx * self.N_traj
                     nn_input = nn_input[mask_idx, :]
 
-                with record_function("TAG: evaluate NN_4"):
+                with record_function("TAG: evaluate NN_4 (forward+backward pass)"):
                     # forward + backward pass to get gradients for closest obstacles
                     #nn_dist, nn_grad, nn_minidx = self.nn_model.compute_signed_distance_wgrad(nn_input[:, 0:-1], 'closest')
                     nn_dist, nn_grad, nn_minidx = self.nn_model.dist_grad_closest(nn_input[:, 0:-1])
 
-                with record_function("TAG: evaluate NN_5"):
+                with record_function("TAG: evaluate NN_5 (process outputs)"):
                     # cleaning up to get distances and gradients for closest obstacles
                     nn_dist -= nn_input[:, -1].unsqueeze(1) + 0.5 # subtract radius and some threshold
                     nn_dist = nn_dist[torch.arange(self.N_traj).unsqueeze(1), nn_minidx.unsqueeze(1)]
