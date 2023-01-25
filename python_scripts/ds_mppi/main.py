@@ -13,10 +13,15 @@ sys.path.append('../mlp_learn/')
 from sdf.robot_sdf import RobotSdfCollisionNet
 
 # define tensor parameters (cpu or cuda:0)
-if 1:
+if 0:
     params = {'device': 'cpu', 'dtype': torch.float32}
 else:
     params = {'device': 'cuda:0', 'dtype': torch.float32}
+
+
+# trace_handler for pytorch profiling
+def trace_handler(profiler):
+    print(profiler.key_averages().table(sort_by="cpu_time_total", row_limit=20))
 
 
 def main_int():
@@ -47,9 +52,9 @@ def main_int():
     dh_a[1:] = L  # link length
     dh_params = torch.vstack((dh_a * 0, dh_a * 0, dh_a, dh_a * 0)).T
     # Obstacle spheres (x, y, z, r)
-    obs = torch.tensor([[3, 3, 0, .3],
+    obs = torch.tensor([[4, 3, 0, .3],
                         [5, 0, 0, .3],
-                        [3, -3, 0, .3]]).to(**params)
+                        [4, -3, 0, .3]]).to(**params)
     # Plotting
     r_h = init_robot_plot(dh_params, -10, 10, -10, 10)
     o_h_arr = plot_obs_init(obs)
@@ -70,21 +75,21 @@ def main_int():
         a,b,c = mppi.propagate()
     t0 = time.time()
     print('Init time: %4.2fs' % (t0 - t00))
-    #prof = cProfile.Profile()
-    #prof.enable()
-
-    #with profile(activities=[ProfilerActivity.CPU], profile_memory=True, record_shapes=True) as prof:
-    with open('.pytest_cache/dummy', 'w') as dummy_file: #that's an empty with statement to replace profining when unused
+    with profile(schedule=torch.profiler.schedule(wait=10, warmup=1, active=1, repeat=1),
+                 activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+                 on_trace_ready=trace_handler,
+                 profile_memory=True, record_shapes=True, with_stack=True) as torch_profiler:
+    #with open('.pytest_cache/dummy', 'w') as dummy_file: #that's an empty with statement to replace profining when unused
         while torch.norm(mppi.q_cur - q_f) > 0.1:
             t_iter = time.time()
             # Sample random policies
             mppi.Policy.sample_policy()
             # Propagate modulated DS
 
-            with record_function("general propagation"):
+            with record_function("TAG: general propagation"):
                 all_traj, closests_dist_all, kernel_val_all = mppi.propagate()
 
-            with record_function("cost calculation"):
+            with record_function("TAG: cost calculation"):
                 # Calculate cost
                 cost = mppi.get_cost()
                 best_idx = torch.argmin(cost)
@@ -99,26 +104,23 @@ def main_int():
             mppi.q_cur = all_traj[best_idx, 1, :]
             cur_fk, _ = numeric_fk_model(mppi.q_cur, dh_params, 10)
             upd_r_h(cur_fk.to('cpu'), r_h)
-
             # obs[0, 0] += 0.03
             # plot_obs_update(o_h_arr, obs)
             plt.pause(0.0001)
             N_ITER += 1
-            if N_ITER > 1000:
+            torch_profiler.step()
+            if N_ITER > 100:
                 break
             # print(q_cur)
             t_iter = time.time() - t_iter
             print(f'Iteration:{N_ITER:4d}, Time:{t_iter:4.2f}, Frequency:{1/t_iter:4.2f},'
                   f' Avg. frequency:{N_ITER/(time.time()-t0):4.2f}')
     td = time.time() - t0
-    #prof.disable()
-    #stats = pstats.Stats(prof).strip_dirs().sort_stats("cumtime")
-    #stats.print_stats(20)
     print('Time: ', td)
     print('Time per iteration: ', td / N_ITER, 'Hz: ', 1 / (td / N_ITER))
     print('Time per rollout: ', td / (N_ITER * N_traj))
     print('Time per rollout step: ', td / (N_ITER * N_traj * dt_H))
-    #print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))
+    #print(torch_profiler.key_averages().table(sort_by="cpu_time_total", row_limit=20))
     plt.pause(10)
 
 

@@ -67,35 +67,50 @@ class MPPI:
         self.all_traj[:, 0, :] = self.q_cur
         P = self.Policy
         for i in range(1, self.dt_H):
-            with record_function("nominal vector field"):
+            with record_function("TAG: Nominal vector field"):
                 q_cur = self.all_traj[:, i, :]
                 q_prev = self.all_traj[:, i - 1, :]
                 # calculate nominal vector field
                 nominal_velocity = (q_prev - self.qf) @ self.A
             # apply policies
-            with record_function("apply policies"):
+            with record_function("TAG: Apply policies"):
                 kernel_value = eval_rbf(q_prev, P.mu_tmp[:, 0:P.n_kernels], P.sigma_tmp[:, 0:P.n_kernels])
                 policy_value = torch.sum(P.alpha_tmp[:, 0:P.n_kernels] * kernel_value, 1)
                 if P.n_kernels > 0:
                     self.kernel_val_all[:, i - 1, 0:P.n_kernels] = kernel_value.reshape((self.N_traj, P.n_kernels))
-            with record_function("evaluate NN"):
+            with record_function("TAG: evaluate NN"):
                 # evaluate NN
-                nn_input = self.build_nn_input(q_prev, self.obs)
-                nn_dist = self.nn_model.model.forward(nn_input[:, 0:-1])
-                nn_dist -= nn_input[:, -1].unsqueeze(1) # subtract radius
-                mindist, _ = nn_dist.min(1)
-                mindist, sphere_idx = mindist.reshape(self.n_obs, self.N_traj).transpose(0, 1).min(1)
-                mask_idx = self.traj_range + sphere_idx * self.N_traj
-                nn_input = nn_input[mask_idx, :]
-                #nn_dist, nn_grad, nn_minidx = self.nn_model.compute_signed_distance_wgrad(nn_input[:, 0:-1], 'closest')
-                nn_dist, nn_grad, nn_minidx = self.nn_model.dist_grad_closest(nn_input[:, 0:-1])
-                nn_dist -= nn_input[:, -1].unsqueeze(1) + 0.2 # subtract radius and some threshold
-                nn_dist = nn_dist[torch.arange(self.N_traj).unsqueeze(1), nn_minidx.unsqueeze(1)]
-                # get gradients
-                self.nn_grad = nn_grad.squeeze(2)[:, 0:self.n_dof]
-                distance = nn_dist.squeeze(1)
-                self.closest_dist_all[:, i - 1] = distance
-            with record_function("QR"):
+                with record_function("TAG: evaluate NN_1"):
+                    # building input tensor for NN (N_traj * n_obs, n_dof + 3)
+                    nn_input = self.build_nn_input(q_prev, self.obs)
+
+                with record_function("TAG: evaluate NN_2"):
+                    # doing single forward pass to figure out the closest obstacle for each configuration
+                    nn_dist = self.nn_model.model.forward(nn_input[:, 0:-1])
+
+                with record_function("TAG: evaluate NN_3"):
+                    # rebuilding input tensor to only include closest obstacles
+                    nn_dist -= nn_input[:, -1].unsqueeze(1) # subtract radius
+                    mindist, _ = nn_dist.min(1)
+                    mindist, sphere_idx = mindist.reshape(self.n_obs, self.N_traj).transpose(0, 1).min(1)
+                    mask_idx = self.traj_range + sphere_idx * self.N_traj
+                    nn_input = nn_input[mask_idx, :]
+
+                with record_function("TAG: evaluate NN_4"):
+                    # forward + backward pass to get gradients for closest obstacles
+                    #nn_dist, nn_grad, nn_minidx = self.nn_model.compute_signed_distance_wgrad(nn_input[:, 0:-1], 'closest')
+                    nn_dist, nn_grad, nn_minidx = self.nn_model.dist_grad_closest(nn_input[:, 0:-1])
+
+                with record_function("TAG: evaluate NN_5"):
+                    # cleaning up to get distances and gradients for closest obstacles
+                    nn_dist -= nn_input[:, -1].unsqueeze(1) + 0.5 # subtract radius and some threshold
+                    nn_dist = nn_dist[torch.arange(self.N_traj).unsqueeze(1), nn_minidx.unsqueeze(1)]
+                    # get gradients
+                    self.nn_grad = nn_grad.squeeze(2)[:, 0:self.n_dof]
+                    distance = nn_dist.squeeze(1)
+                    self.closest_dist_all[:, i - 1] = distance
+
+            with record_function("TAG: QR decomposition"):
                 # calculate modulations
                 self.basis_eye_temp = self.basis_eye_temp*0 + self.basis_eye
                 self.basis_eye_temp[:, :, 0] = self.nn_grad
@@ -103,9 +118,9 @@ class MPPI:
                 E, R = torch.linalg.qr(self.basis_eye_temp.to(torch.float32))
                 E[:, :, 0] = self.nn_grad / self.nn_grad.norm(2, 1).unsqueeze(1)
                 E = E.to(**self.tensor_args)
-            with record_function("Modulation-propagation"):
+            with record_function("TAG: Modulation-propagation"):
                 # calculate standard modulation coefficients
-                gamma = distance + 1 - 0.3
+                gamma = distance + 1
                 gamma[gamma < 0] = 1e-8
                 l_n = 1 - 1 / gamma
                 l_tau = 1 + 1 / gamma
@@ -117,7 +132,7 @@ class MPPI:
                 self.D[:, 0, 0] = l_n
                 # build modulation matrix
                 M = E @ self.D @ E.transpose(1, 2)
-            with record_function("apply policy"):
+            with record_function("TAG: Apply policy"):
                 # policy control
                 policy_value[abs(policy_value) < 1e-6] = 0  # to normalize without errors
                 policy_value = torch.nan_to_num(policy_value / torch.norm(policy_value, 2, 1).unsqueeze(1))
@@ -131,7 +146,7 @@ class MPPI:
                 mod_velocity = torch.nan_to_num(mod_velocity / mod_velocity_norm)
                 # slow down for collision case
                 mod_velocity[distance < 0] *= 0.1
-            with record_function("propagate"):
+            with record_function("TAG: Propagate"):
                 # propagate
                 self.all_traj[:, i, :] = self.all_traj[:, i - 1, :] + self.dt * mod_velocity
         return self.all_traj, self.closest_dist_all, self.kernel_val_all[:, :, 0:P.n_kernels]
