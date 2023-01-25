@@ -30,6 +30,12 @@ def init_jpos_plot(xmin, xmax, ymin, ymax):
     plt.show()
     return rob
 
+def init_kernel_means(n_kernel_max):
+    c_h = []
+    for i in range(n_kernel_max):
+        tmp, = plt.plot([], [], '-o', color=[0, 0.60, 0.90], markersize=1)
+        c_h.append(tmp)
+    return c_h
 
 def upd_jpos_plot(jpos, ln):
     # Update the joint position plot

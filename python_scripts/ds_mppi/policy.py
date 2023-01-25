@@ -25,7 +25,7 @@ class TensorPolicyMPPI:
                                    **self.params)  # Weights of RBF kernels for each tangential direction
         # Policy sigmas
         self.mu_s = torch.tensor(0, **self.params)
-        self.sigma_s = torch.tensor(0, **self.params)
+        self.sigma_s = torch.tensor(0.0, **self.params)
         self.alpha_s = torch.tensor(0.5, **self.params)
         # sampled policy
         self.mu_tmp = torch.zeros((self.n_traj, self.N_KERNEL_MAX, self.n_dof), **self.params)
@@ -37,15 +37,20 @@ class TensorPolicyMPPI:
         # self.mu_tmp = torch.randn((self.n_traj, self.N_KERNEL_MAX, self.n_dof), **self.params) * torch.sqrt(self.mu_s) + self.mu_c
         # self.sigma_tmp = torch.randn((self.n_traj, self.N_KERNEL_MAX), **self.params) * torch.sqrt(self.sigma_s) + self.sigma_c
         # self.alpha_tmp = torch.randn((self.n_traj, self.N_KERNEL_MAX, self.n_dof-1), **self.params) * torch.sqrt(self.alpha_s) + self.alpha_c
-        self.mu_tmp[:, :self.n_kernels] = torch.randn((self.n_traj, self.n_kernels, self.n_dof),
-                                                      **self.params) * torch.sqrt(self.mu_s) + self.mu_c[
-                                                                                               :self.n_kernels]
-        self.sigma_tmp[:, :self.n_kernels] = torch.randn((self.n_traj, self.n_kernels), **self.params) * torch.sqrt(
-            self.sigma_s) + self.sigma_c[:self.n_kernels]
-        self.alpha_tmp[:, :self.n_kernels] = torch.randn((self.n_traj, self.n_kernels, self.n_dof - 1),
-                                                         **self.params) * torch.sqrt(self.alpha_s) + self.alpha_c[
-                                                                                                     :self.n_kernels]
-
+        # previous implementation (copying from CPU!)
+        # self.mu_tmp[:, :self.n_kernels] = torch.randn((self.n_traj, self.n_kernels, self.n_dof),
+        #                                               **self.params) * self.mu_s + self.mu_c[:self.n_kernels]
+        # self.sigma_tmp[:, :self.n_kernels] = torch.randn((self.n_traj, self.n_kernels),
+        #                                                  **self.params) * self.sigma_s + self.sigma_c[:self.n_kernels]
+        # self.alpha_tmp[:, :self.n_kernels] = torch.randn((self.n_traj, self.n_kernels, self.n_dof - 1),
+        #                                                  **self.params) * self.alpha_s + self.alpha_c[:self.n_kernels]
+        # GPU sampling
+        self.mu_tmp[:, :self.n_kernels] = self.mu_tmp[:, :self.n_kernels].normal_(mean=0, std=self.mu_s) \
+                                          + self.mu_c[:self.n_kernels]
+        self.sigma_tmp[:, :self.n_kernels] = self.sigma_tmp[:, :self.n_kernels].normal_(mean=0, std=self.sigma_s) \
+                                                + self.sigma_c[:self.n_kernels]
+        self.alpha_tmp[:, :self.n_kernels] = self.alpha_tmp[:, :self.n_kernels].normal_(mean=0, std=self.alpha_s) \
+                                                + self.alpha_c[:self.n_kernels]
     def update_policy(self, w, upd_rate):
         # Update policy parameters, use current state(mu_c, sigma_c and alpha_c)
         # and a sampled policy (mu_tmp, sigma_tmp, alpha_tmp) with weights w

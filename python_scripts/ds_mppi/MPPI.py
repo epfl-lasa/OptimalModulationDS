@@ -1,6 +1,7 @@
 from policy import *
 from cost import *
 import sys
+from torch.profiler import record_function
 
 #@torch.jit.script
 def tangent_basis(normal_vec):
@@ -48,11 +49,13 @@ class MPPI:
         self.D = (torch.zeros([self.N_traj, self.n_dof, self.n_dof]) + torch.eye(self.n_dof)).to(**self.tensor_args)
         self.nn_grad = torch.zeros(N_traj, self.n_dof).to(**self.tensor_args)
         self.norm_basis = torch.zeros((self.N_traj, self.n_dof, self.n_dof)).to(**self.tensor_args)
-        self.basis_eye = torch.eye(self.n_dof).repeat(N_traj, 1).reshape(N_traj, self.n_dof, self.n_dof).to(**self.tensor_args)
-        self.basis_eye_temp = (self.basis_eye * 0).to(**self.tensor_args)
+        self.basis_eye = torch.eye(self.n_dof).repeat(N_traj, 1).reshape(N_traj, self.n_dof, self.n_dof).to(**self.tensor_args).cpu()
+        self.basis_eye_temp = (self.basis_eye * 0).to(**self.tensor_args).cpu()
         self.nn_model.allocate_gradients(self.N_traj, self.tensor_args)
-        self.Cost = Cost(self.qf)
+        self.Cost = Cost(self.qf, self.dh_params)
         self.traj_range = torch.arange(self.N_traj).to(**self.tensor_args).to(torch.long)
+        self.policy_upd_rate = 0.1
+        self.dst_thr = 0.5
     def reset_tensors(self):
         self.all_traj = self.all_traj * 0
         self.closest_dist_all = 100 + self.closest_dist_all * 0
@@ -103,7 +106,7 @@ class MPPI:
 
                 with record_function("TAG: evaluate NN_5 (process outputs)"):
                     # cleaning up to get distances and gradients for closest obstacles
-                    nn_dist -= nn_input[:, -1].unsqueeze(1) + 0.5 # subtract radius and some threshold
+                    nn_dist -= nn_input[:, -1].unsqueeze(1) + self.dst_thr # subtract radius and some threshold
                     nn_dist = nn_dist[torch.arange(self.N_traj).unsqueeze(1), nn_minidx.unsqueeze(1)]
                     # get gradients
                     self.nn_grad = nn_grad.squeeze(2)[:, 0:self.n_dof]
@@ -113,11 +116,10 @@ class MPPI:
             with record_function("TAG: QR decomposition"):
                 # calculate modulations
                 self.basis_eye_temp = self.basis_eye_temp*0 + self.basis_eye
-                self.basis_eye_temp[:, :, 0] = self.nn_grad
-                # QR decomposition
-                E, R = torch.linalg.qr(self.basis_eye_temp.to(torch.float32))
-                E[:, :, 0] = self.nn_grad / self.nn_grad.norm(2, 1).unsqueeze(1)
+                self.basis_eye_temp[:, :, 0] = self.nn_grad.cpu()
+                E, R = torch.linalg.qr(self.basis_eye_temp)
                 E = E.to(**self.tensor_args)
+                E[:, :, 0] = self.nn_grad / self.nn_grad.norm(2, 1).unsqueeze(1)
             with record_function("TAG: Modulation-propagation"):
                 # calculate standard modulation coefficients
                 gamma = distance + 1
@@ -160,5 +162,5 @@ class MPPI:
         beta = self.cur_cost.mean() / 50
         w = torch.exp(-1 / beta * self.cur_cost)
         w = w / w.sum()
-        self.Policy.update_policy(w, 0.5)
+        self.Policy.update_policy(w, self.policy_upd_rate)
         return 0
