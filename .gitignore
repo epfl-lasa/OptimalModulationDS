@@ -8,6 +8,8 @@
 *.obj
 *.elf
 
+# Traces
+*.json
 # Linker output
 *.ilk
 *.map
