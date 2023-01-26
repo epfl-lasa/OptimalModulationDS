@@ -39,8 +39,8 @@ print("Sum of parameters:%d" % nelem)
 
 # print(x.shape)
 N_REP = 100
-H = 20
-N_TRAJ = 100
+H = 1
+N_TRAJ = 1
 N_OBS = 1
 tens_input = torch.tile(x[0:N_TRAJ, :], (N_OBS, 1))
 for i in range(10):
@@ -65,7 +65,7 @@ for i in range(N_REP):
         tens_input.requires_grad = False
         tens_input = tens_input+0.1
         #y_pred = nn_model.compute_signed_distance_wgrad(tens_input, 'closest')
-        #y_pred = nn_model.dist_grad_closest(tens_input)
+        y_pred = nn_model.dist_grad_closest(tens_input)
         #y_pred = nn_model.model.forward(tens_input)
         #y_pred = nn_model.compute_signed_distance_wgrad2(tens_input)
         # y_pred = aot_fn(tens_input)
@@ -78,7 +78,7 @@ t1 = time.time()
 print('Total time: %4.2fs' % (t1 - t0))
 print('Avg freq: %4.2f Hz' % (N_REP/(t1 - t0)))
 
-print("Time per sample: %4.10f" % ((t1 - t0) / (N_REP * H * tens_input.shape[0])))
+print("Time per sample: %4.10fms" % (1e6*(t1 - t0) / (N_REP * H * tens_input.shape[0])))
 # print(y_pred.shape, y_test.shape)
 #loss = F.l1_loss(y_pred, y, reduction='mean')
 #print(torch.median(y_pred), torch.mean(y_pred))

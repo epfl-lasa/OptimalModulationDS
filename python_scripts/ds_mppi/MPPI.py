@@ -77,12 +77,14 @@ class MPPI:
             with record_function("TAG: evaluate NN"):
                 # evaluate NN
                 distance, self.nn_grad = self.distance_repulsion_nn(q_prev)
+                #distance, self.nn_grad = self.distance_repulsion_fk(q_prev)
+                distance -= self.dst_thr
                 self.closest_dist_all[:, i - 1] = distance
 
             with record_function("TAG: QR decomposition"):
                 # calculate modulations
                 self.basis_eye_temp = self.basis_eye_temp*0 + self.basis_eye
-                self.basis_eye_temp[:, :, 0] = self.nn_grad.cpu()
+                self.basis_eye_temp[:, :, 0] = self.nn_grad.cpu().to(torch.float32)
                 E, R = torch.linalg.qr(self.basis_eye_temp)
                 E = E.to(**self.tensor_args)
                 E[:, :, 0] = self.nn_grad / self.nn_grad.norm(2, 1).unsqueeze(1)
@@ -143,21 +145,21 @@ class MPPI:
 
         with record_function("TAG: evaluate NN_5 (process outputs)"):
             # cleaning up to get distances and gradients for closest obstacles
-            nn_dist -= nn_input[:, -1].unsqueeze(1) + self.dst_thr  # subtract radius and some threshold
-            nn_dist = nn_dist[torch.arange(self.N_traj).unsqueeze(1), nn_minidx.unsqueeze(1)]
+            nn_dist -= nn_input[:, -1].unsqueeze(1)  # subtract radius and some threshold
+            nn_dist = nn_dist[self.traj_range.unsqueeze(1), nn_minidx.unsqueeze(1)]
             # get gradients
             self.nn_grad = nn_grad.squeeze(2)[:, 0:self.n_dof]
             distance = nn_dist.squeeze(1)
         return distance, self.nn_grad
 
-    # def distance_repulsion_fk(self, q_prev):
-    #     all_links, all_int_pts = numeric_fk_model_vec(q_prev, self.dh_params, 10)
-    #     distance, idx_obs_closest, idx_links_closest, idx_pts_closest = get_mindist(all_links, obs)
-    #     obs_pos_closest = obs[idx_obs_closest, 0:3].squeeze(1)
-    #     int_points_closest = all_int_pts[torch.arange(N_traj).unsqueeze(1), idx_links_closest, idx_pts_closest].squeeze(1)
-    #     rep_vec = lambda_rep_vec(all_traj[:, i - 1, :], obs_pos_closest, idx_links_closest, int_points_closest, dh_a)
-    #     rep_vec = rep_vec[:, 0:n_dof]
-    #     E = tangent_basis_vec(rep_vec)
+    def distance_repulsion_fk(self, q_prev):
+        all_links, all_int_pts = numeric_fk_model_vec(q_prev, self.dh_params, 10)
+        distance, idx_obs_closest, idx_links_closest, idx_pts_closest = get_mindist(all_links, self.obs)
+        obs_pos_closest = self.obs[idx_obs_closest, 0:3].squeeze(1)
+        int_points_closest = all_int_pts[self.traj_range.unsqueeze(1), idx_links_closest, idx_pts_closest].squeeze(1)
+        rep_vec = lambda_rep_vec(q_prev, obs_pos_closest, idx_links_closest, int_points_closest, self.dh_a)
+        self.nn_grad = rep_vec[:, 0:self.n_dof]
+        return distance, rep_vec
 
     def get_cost(self):
         self.cur_cost = self.Cost.evaluate_costs(self.all_traj, self.closest_dist_all)
