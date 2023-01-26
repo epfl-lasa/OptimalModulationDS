@@ -18,15 +18,15 @@ nn_model.load_weights('models/' + fname, tensor_args)
 model = nn_model.model
 nelem = sum([param.nelement() for param in model.parameters()])
 
-f = open("network.txt", "a")
+f = open("network2.txt", "a")
 data = [len(model.layers[0])]
 for i, layer in enumerate(model.layers[0]):
     W = layer[0].weight.detach().numpy()
     b = layer[0].bias.detach().numpy()
     shape = np.array(W.shape)
     print(i)
-    np.savetxt(f, shape.reshape(1, -1), fmt='%d')
-    np.savetxt(f, W, fmt='%f')
+    np.savetxt(f, np.flip(shape).reshape(1, -1), fmt='%d')
+    np.savetxt(f, W.transpose(), fmt='%f')
     np.savetxt(f, b.reshape(1, -1), fmt='%f')
 f.close()
     # print(p.shape)

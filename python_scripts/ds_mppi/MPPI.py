@@ -1,28 +1,19 @@
 from policy import *
 from cost import *
-import sys
+from fk_num import *
+from fk_sym_gen import *
+
 from torch.profiler import record_function
 
-#@torch.jit.script
-def tangent_basis(normal_vec):
-    A = torch.eye(normal_vec.shape[0]).to(normal_vec.device, normal_vec.dtype)
-    A[:, 0] = normal_vec
-    Q, R = torch.linalg.qr(A)
-    Q[:, 0] = normal_vec / torch.linalg.norm(normal_vec)
-    return Q.nan_to_num()
 
-#@torch.jit.script
-def tangent_basis_vec(normal_tens, norm_basis):
-    norm_basis = norm_basis * 0
-    for i, n_v in enumerate(normal_tens):
-        norm_basis[i] = tangent_basis(n_v)
-    return norm_basis
-
-def tangent_basis_tens(normal_tens):
-    a = torch.eye(2).repeat(normal_tens.shape[0], 1).reshape(normal_tens.shape[0], normal_tens.shape[1], normal_tens.shape[1])
-    a[:, :, 0] = normal_tens
-    Q, R = torch.linalg.qr(a)
-    return Q.nan_to_num()
+@torch.jit.script
+def get_mindist(all_links, obs):
+    mindists = dist_tens(all_links, obs)
+    # calculate repulsions using fk_sym_gen
+    idx_obs_closest = mindists[:, 1].to(torch.long).unsqueeze(1)
+    idx_links_closest = mindists[:, 2].to(torch.long).unsqueeze(1)
+    idx_pts_closest = mindists[:, 3].to(torch.long).unsqueeze(1)
+    return mindists[:, 0], idx_obs_closest, idx_links_closest, idx_pts_closest
 
 class MPPI:
     def __init__(self, q0: torch.Tensor, qf: torch.Tensor, dh_params: torch.Tensor, obs: torch.Tensor, dt: float,
@@ -78,40 +69,15 @@ class MPPI:
             # apply policies
             with record_function("TAG: Apply policies"):
                 kernel_value = eval_rbf(q_prev, P.mu_tmp[:, 0:P.n_kernels], P.sigma_tmp[:, 0:P.n_kernels])
+                kernel_value[kernel_value < 1e-3] = 0
                 policy_value = torch.sum(P.alpha_tmp[:, 0:P.n_kernels] * kernel_value, 1)
                 if P.n_kernels > 0:
                     self.kernel_val_all[:, i - 1, 0:P.n_kernels] = kernel_value.reshape((self.N_traj, P.n_kernels))
+            #distance calculation (NN)
             with record_function("TAG: evaluate NN"):
                 # evaluate NN
-                with record_function("TAG: evaluate NN_1 (build input)"):
-                    # building input tensor for NN (N_traj * n_obs, n_dof + 3)
-                    nn_input = self.build_nn_input(q_prev, self.obs)
-
-                with record_function("TAG: evaluate NN_2 (forward pass)"):
-                    # doing single forward pass to figure out the closest obstacle for each configuration
-                    nn_dist = self.nn_model.model.forward(nn_input[:, 0:-1])
-
-                with record_function("TAG: evaluate NN_3 (get closest obstacle)"):
-                    # rebuilding input tensor to only include closest obstacles
-                    nn_dist -= nn_input[:, -1].unsqueeze(1) # subtract radius
-                    mindist, _ = nn_dist.min(1)
-                    mindist, sphere_idx = mindist.reshape(self.n_obs, self.N_traj).transpose(0, 1).min(1)
-                    mask_idx = self.traj_range + sphere_idx * self.N_traj
-                    nn_input = nn_input[mask_idx, :]
-
-                with record_function("TAG: evaluate NN_4 (forward+backward pass)"):
-                    # forward + backward pass to get gradients for closest obstacles
-                    #nn_dist, nn_grad, nn_minidx = self.nn_model.compute_signed_distance_wgrad(nn_input[:, 0:-1], 'closest')
-                    nn_dist, nn_grad, nn_minidx = self.nn_model.dist_grad_closest(nn_input[:, 0:-1])
-
-                with record_function("TAG: evaluate NN_5 (process outputs)"):
-                    # cleaning up to get distances and gradients for closest obstacles
-                    nn_dist -= nn_input[:, -1].unsqueeze(1) + self.dst_thr # subtract radius and some threshold
-                    nn_dist = nn_dist[torch.arange(self.N_traj).unsqueeze(1), nn_minidx.unsqueeze(1)]
-                    # get gradients
-                    self.nn_grad = nn_grad.squeeze(2)[:, 0:self.n_dof]
-                    distance = nn_dist.squeeze(1)
-                    self.closest_dist_all[:, i - 1] = distance
+                distance, self.nn_grad = self.distance_repulsion_nn(q_prev)
+                self.closest_dist_all[:, i - 1] = distance
 
             with record_function("TAG: QR decomposition"):
                 # calculate modulations
@@ -153,6 +119,45 @@ class MPPI:
                 self.all_traj[:, i, :] = self.all_traj[:, i - 1, :] + self.dt * mod_velocity
         return self.all_traj, self.closest_dist_all, self.kernel_val_all[:, :, 0:P.n_kernels]
 
+    def distance_repulsion_nn(self, q_prev):
+        with record_function("TAG: evaluate NN_1 (build input)"):
+            # building input tensor for NN (N_traj * n_obs, n_dof + 3)
+            nn_input = self.build_nn_input(q_prev, self.obs)
+
+        with record_function("TAG: evaluate NN_2 (forward pass)"):
+            # doing single forward pass to figure out the closest obstacle for each configuration
+            nn_dist = self.nn_model.model.forward(nn_input[:, 0:-1])
+
+        with record_function("TAG: evaluate NN_3 (get closest obstacle)"):
+            # rebuilding input tensor to only include closest obstacles
+            nn_dist -= nn_input[:, -1].unsqueeze(1)  # subtract radius
+            mindist, _ = nn_dist.min(1)
+            mindist, sphere_idx = mindist.reshape(self.n_obs, self.N_traj).transpose(0, 1).min(1)
+            mask_idx = self.traj_range + sphere_idx * self.N_traj
+            nn_input = nn_input[mask_idx, :]
+
+        with record_function("TAG: evaluate NN_4 (forward+backward pass)"):
+            # forward + backward pass to get gradients for closest obstacles
+            # nn_dist, nn_grad, nn_minidx = self.nn_model.compute_signed_distance_wgrad(nn_input[:, 0:-1], 'closest')
+            nn_dist, nn_grad, nn_minidx = self.nn_model.dist_grad_closest(nn_input[:, 0:-1])
+
+        with record_function("TAG: evaluate NN_5 (process outputs)"):
+            # cleaning up to get distances and gradients for closest obstacles
+            nn_dist -= nn_input[:, -1].unsqueeze(1) + self.dst_thr  # subtract radius and some threshold
+            nn_dist = nn_dist[torch.arange(self.N_traj).unsqueeze(1), nn_minidx.unsqueeze(1)]
+            # get gradients
+            self.nn_grad = nn_grad.squeeze(2)[:, 0:self.n_dof]
+            distance = nn_dist.squeeze(1)
+        return distance, self.nn_grad
+
+    # def distance_repulsion_fk(self, q_prev):
+    #     all_links, all_int_pts = numeric_fk_model_vec(q_prev, self.dh_params, 10)
+    #     distance, idx_obs_closest, idx_links_closest, idx_pts_closest = get_mindist(all_links, obs)
+    #     obs_pos_closest = obs[idx_obs_closest, 0:3].squeeze(1)
+    #     int_points_closest = all_int_pts[torch.arange(N_traj).unsqueeze(1), idx_links_closest, idx_pts_closest].squeeze(1)
+    #     rep_vec = lambda_rep_vec(all_traj[:, i - 1, :], obs_pos_closest, idx_links_closest, int_points_closest, dh_a)
+    #     rep_vec = rep_vec[:, 0:n_dof]
+    #     E = tangent_basis_vec(rep_vec)
 
     def get_cost(self):
         self.cur_cost = self.Cost.evaluate_costs(self.all_traj, self.closest_dist_all)

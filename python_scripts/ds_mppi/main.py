@@ -54,28 +54,28 @@ def main_int():
     dh_a[1:] = L  # link length
     dh_params = torch.vstack((dh_a * 0, dh_a * 0, dh_a, dh_a * 0)).T
     # Obstacle spheres (x, y, z, r)
-    obs = torch.tensor([[2, 3, 0, .5],
-                        [2, 4, 0, .5],
-                        [1, 3, 0, .5]]).to(**params)
+    obs = torch.tensor([#[3, 0, 0, .5],
+                        #[4, 0, 0, .5],
+                        [5, 0, 0, .5]]).to(**params)
     # Plotting
     r_h = init_robot_plot(dh_params, -10, 10, -10, 10)
     c_h = init_kernel_means(100)
     o_h_arr = plot_obs_init(obs)
     # Integration parameters
     A = -1 * torch.diag(torch.ones(DOF)).to(**params)
-    N_traj = 10
+    N_traj = 50
     dt_H = 20
-    dt = 0.1
+    dt = 0.2
     q_cur = q_0
     N_ITER = 0
     # kernel adding thresholds
-    thr_dist = 0.2
+    thr_dist = 0.5
     thr_rbf = 0.03
     mppi = MPPI(q_0, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a, nn_model)
-    mppi.Policy.sigma_c_nominal = 0.5
+    mppi.Policy.sigma_c_nominal = 0.3
     mppi.Policy.alpha_s = 0.3
     mppi.Policy.policy_upd_rate = 0.5
-    mppi.dst_thr = 0.3
+    mppi.dst_thr = 0.2
     # jit warmup
     for i in range(50):
         a,b,c = mppi.propagate()
@@ -107,7 +107,7 @@ def main_int():
                 rand_idx = torch.randint(kernel_candidates.shape[0], (1,))
                 mppi.Policy.add_kernel(kernel_candidates[rand_idx[0]])
                 kernel_fk, _ = numeric_fk_model(kernel_candidates[rand_idx[0]], dh_params, 10)
-                upd_r_h(kernel_fk.to('cpu'), c_h[mppi.Policy.n_kernels - 1])
+                upd_r_h(kernel_fk.to('cpu'), c_h[(mppi.Policy.n_kernels - 1) % len(c_h)])
 
             # Update current robot state
             mppi.q_cur = all_traj[best_idx, 1, :]
