@@ -1,3 +1,5 @@
+import torch
+
 from propagation import *
 import sys
 import cProfile
@@ -41,8 +43,15 @@ def main_int():
     nn_model = RobotSdfCollisionNet(in_channels=DOF+3, out_channels=DOF, layers=[s] * n_layers, skips=skips)
     nn_model.load_weights('../mlp_learn/models/' + fname, params)
     nn_model.model.to(**params)
+    nn_model.modelq = torch.quantization.quantize_dynamic(
+        nn_model.model, qconfig_spec={torch.nn.Linear}, dtype=torch.qint8
+    )
+
     nn_model.model = torch.jit.script(nn_model.model)
     nn_model.model = torch.jit.optimize_for_inference(nn_model.model)
+
+    nn_model.modelq = torch.jit.script(nn_model.modelq)
+    nn_model.modelq = torch.jit.optimize_for_inference(nn_model.modelq)
 
     # Initial state
     q_0 = torch.zeros(DOF).to(**params)
@@ -75,10 +84,12 @@ def main_int():
     mppi.Policy.sigma_c_nominal = 0.3
     mppi.Policy.alpha_s = 0.3
     mppi.Policy.policy_upd_rate = 0.5
-    mppi.dst_thr = 0.2
+    mppi.dst_thr = 0.4
     # jit warmup
-    for i in range(50):
-        a,b,c = mppi.propagate()
+    for i in range(200):
+        _ = mppi.nn_model.model.forward(torch.randn(N_traj*obs.shape[0], 10).to(**params))
+        _, _, _ = mppi.nn_model.dist_grad_closest(torch.randn(N_traj, 10).to(**params))
+
     t0 = time.time()
     print('Init time: %4.2fs' % (t0 - t00))
     PROFILING = False

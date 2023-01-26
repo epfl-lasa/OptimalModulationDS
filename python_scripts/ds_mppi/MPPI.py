@@ -128,7 +128,7 @@ class MPPI:
 
         with record_function("TAG: evaluate NN_2 (forward pass)"):
             # doing single forward pass to figure out the closest obstacle for each configuration
-            nn_dist = self.nn_model.model.forward(nn_input[:, 0:-1])
+            nn_dist = self.nn_model.modelq.forward(nn_input[:, 0:-1])
 
         with record_function("TAG: evaluate NN_3 (get closest obstacle)"):
             # rebuilding input tensor to only include closest obstacles

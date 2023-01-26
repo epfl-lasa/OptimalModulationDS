@@ -137,6 +137,11 @@ class RobotSdfCollisionNet():
         return dist_scale.detach(), self.grads.detach(), minidxMask.detach()
 
 
+    def tmp_fcn(self, model, q):
+        dist_scale = model.forward(q)
+        dist_scale.backward()
+        return dist_scale, q.grad
+
     def compute_signed_distance_wgrad2(self, q):
         grad_map = torch.zeros(7, q.shape[0], 7, device = q.device, dtype = q.dtype)
         dists, vjp_fn = vjp(partial(self.model.forward), q)

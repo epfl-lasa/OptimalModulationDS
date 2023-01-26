@@ -9,10 +9,6 @@ import numpy as np
 import time
 from sdf.robot_sdf import RobotSdfCollisionNet
 
-def _func_sum(model, points):
-    return model(points).sum(dim=0)
-#torch.jit.enable_onednn_fusion(True)
-
 tensor_args = {'device': 'cpu', 'dtype': torch.float32}
 
 q_dof = 7
