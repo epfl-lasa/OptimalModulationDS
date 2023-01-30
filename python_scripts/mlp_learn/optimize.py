@@ -28,9 +28,9 @@ nn_model.load_weights('models/' + fname, tensor_args)
 model = nn_model.model
 model.to(**tensor_args)
 
-model = torch.quantization.quantize_dynamic(
-    model, qconfig_spec={torch.nn.Linear}, dtype=torch.qint8
-)
+# model = torch.quantization.quantize_dynamic(
+#     model, qconfig_spec={torch.nn.Linear}, dtype=torch.qint8
+# )
 
 # backend = "fbgemm"
 # model.qconfig = torch.quantization.get_default_qconfig(backend)

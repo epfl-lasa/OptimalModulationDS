@@ -63,9 +63,12 @@ def main_int():
     dh_a[1:] = L  # link length
     dh_params = torch.vstack((dh_a * 0, dh_a * 0, dh_a, dh_a * 0)).T
     # Obstacle spheres (x, y, z, r)
-    obs = torch.tensor([[4, 2, 0, .5],
+    obs = torch.tensor([[6, 2, 0, .5],
                         [4, -1, 0, .5],
                         [5, 0, 0, .5]]).to(**params)
+    n_dummy = 20
+    dummy_obs = torch.hstack((torch.zeros(n_dummy, 3)+5, torch.zeros(n_dummy, 1)+0.1)).to(**params)
+    obs = torch.vstack((obs, dummy_obs))
     # Plotting
     r_h = init_robot_plot(dh_params, -10, 10, -10, 10)
     c_h = init_kernel_means(100)

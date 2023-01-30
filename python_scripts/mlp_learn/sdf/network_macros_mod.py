@@ -145,6 +145,24 @@ class MLPRegression(nn.Module):
             y = layer(torch.cat((y, x_nerf), dim=1))
         return y
 
+    # def forward_backward(self, x):
+    #     """forward pass on network."""
+    #     x.requires_grad = True
+    #     x.grad = None
+    #     if (self.nerf):
+    #         x_nerf = torch.cat((x, torch.sin(x), torch.cos(x)), dim=-1)
+    #     else:
+    #         x_nerf = x
+    #     y = self.layers[0](x_nerf)
+    #     for layer in self.layers[1:]:
+    #         y = layer(torch.cat((y, x_nerf), dim=1))
+    #     minidxMask = torch.argmin(y, dim=1)
+    #     gradMask = torch.zeros((x.shape[0], x.shape[1]-3), device = x.device, dtype = x.dtype) # same shape as preds
+    #     gradMask[list(range(x.shape[0])), minidxMask] = 1
+    #     y.backward(gradient=gradMask, retain_graph=False)
+    #     return y, x.grad
+
+
     def reset_parameters(self):
         """Use this function to initialize weights. Doesn't help much for mlp.
         """
