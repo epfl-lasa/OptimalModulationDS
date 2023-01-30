@@ -47,6 +47,7 @@ class MPPI:
         self.traj_range = torch.arange(self.N_traj).to(**self.tensor_args).to(torch.long)
         self.policy_upd_rate = 0.1
         self.dst_thr = 0.5
+        self.qdot = torch.zeros((self.N_traj, self.n_dof)).to(**self.tensor_args)
     def reset_tensors(self):
         self.all_traj = self.all_traj * 0
         self.closest_dist_all = 100 + self.closest_dist_all * 0
@@ -119,6 +120,8 @@ class MPPI:
             with record_function("TAG: Propagate"):
                 # propagate
                 self.all_traj[:, i, :] = self.all_traj[:, i - 1, :] + self.dt * mod_velocity
+                if i == 1:
+                    self.qdot = mod_velocity
         return self.all_traj, self.closest_dist_all, self.kernel_val_all[:, :, 0:P.n_kernels]
 
     def distance_repulsion_nn(self, q_prev):

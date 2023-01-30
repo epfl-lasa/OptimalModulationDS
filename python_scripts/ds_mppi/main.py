@@ -83,6 +83,7 @@ def main_int():
     N_traj = 50
     dt_H = 20
     dt = 0.2
+    dt_sim = 0.05
     q_cur = q_0
     N_ITER = 0
     # kernel adding thresholds
@@ -132,7 +133,8 @@ def main_int():
                 upd_r_h(kernel_fk.to('cpu'), c_h[(mppi.Policy.n_kernels - 1) % len(c_h)])
 
             # Update current robot state
-            mppi.q_cur = all_traj[best_idx, 1, :]
+            #mppi.q_cur = all_traj[best_idx, 1, :]
+            mppi.q_cur = mppi.q_cur + mppi.qdot[best_idx, :] * dt_sim
             cur_fk, _ = numeric_fk_model(mppi.q_cur, dh_params, 10)
             upd_r_h(cur_fk.to('cpu'), r_h)
             r_h.set_zorder(10000)
