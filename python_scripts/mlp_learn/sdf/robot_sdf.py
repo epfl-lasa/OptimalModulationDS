@@ -6,11 +6,9 @@ from torch.nn import Sequential as Seq, Linear as Lin, ReLU, ELU, ReLU6, Tanh
 #from .network_macros_mod import MLPRegression, scale_to_base, scale_to_net
 from .network_macros_mod import *
 #from .util_file import *
-from functorch import vmap, jacrev
-#from functorch.compile import aot_function
 from functools import partial
 from functorch import vmap, vjp
-
+from functorch.compile import aot_function, ts_compile
 
 class RobotSdfCollisionNet():
     """This class loads a network to predict the signed distance given a robot joint config."""
@@ -23,8 +21,8 @@ class RobotSdfCollisionNet():
         dropout_ratio = 0
         mlp_layers = layers
         self.model = MLPRegression(self.in_channels, self.out_channels, mlp_layers, skips, act_fn=act_fn, nerf=True)
-        self.m = torch.zeros((500, 1)).to('cuda:0')
-        self.m[:, 0] = 1
+        # self.m = torch.zeros((500, 1)).to('cuda:0')
+        # self.m[:, 0] = 1
         self.order = list(range(self.out_channels))
 
     def set_link_order(self, order):
@@ -150,31 +148,16 @@ class RobotSdfCollisionNet():
         ft_jacobian = (vmap(vjp_fn)(grad_map))[0].sum(0)
         return dists.detach(), ft_jacobian.detach(), minidxMask.detach()
 
-    # def functorch_jacobian(self, points):
-    #     """calculate a jacobian tensor along a batch of inputs. returns something of size
-    #     `batch_size` x `output_dim` x `input_dim`"""
-    #     return vmap(jacrev(self.model))(points)
-    #
-    # def pytorch_jacobian(self, points):
-    #     """calculate a jacobian tensor along a batch of inputs. returns something of size
-    #     `batch_size` x `output_dim` x `input_dim`"""
-    #     def _func_sum(points):
-    #         return self.model(points).sum(dim=0)
-    #     return torch.autograd.functional.jacobian(_func_sum, points, create_graph=True, vectorize=True).permute(1, 0, 2)
-    #
-    # def functorch_jacobian2(self, points):
-    #     """calculate a jacobian tensor along a batch of inputs. returns something of size
-    #     `batch_size` x `output_dim` x `input_dim`"""
-    #     def _func_sum(points):
-    #         return self.model(points).sum(dim=0)
-    #     return jacrev(_func_sum)(points).permute(1, 0, 2)
-    #
-    # def ts_compile(self, fx_g, inps):
-    #     print("compiling")
-    #     f = torch.jit.script(fx_g)
-    #     f = torch.jit.freeze(f.eval())
-    #     return f
-    #
-    # def ts_compiler(self, f):
-    #     return aot_function(f, self.ts_compile, self.ts_compile)
+    def functorch_vjp(self, points):
+        dists, vjp_fn = vjp(self.model.forward, points)
+        minIdx = torch.argmin(dists, dim=1)
+        grad_v = torch.zeros(points.shape[0], points.shape[1] - 3).to(points.device)
+        grad_v[list(range(points.shape[0])), minIdx] = 1
+        return dists, vjp_fn(grad_v)[0], minIdx
 
+    def dist_grad_closest_aot(self, q):
+        return self.aot_lambda(q)
+
+    def update_aot_lambda(self):
+        self.aot_lambda = aot_function(self.functorch_vjp, fw_compiler=ts_compile, bw_compiler=ts_compile)
+        return 0

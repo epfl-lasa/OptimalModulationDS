@@ -43,16 +43,21 @@ def main_int():
     nn_model = RobotSdfCollisionNet(in_channels=DOF+3, out_channels=DOF, layers=[s] * n_layers, skips=skips)
     nn_model.load_weights('../mlp_learn/models/' + fname, params)
     nn_model.model.to(**params)
-    nn_model.modelq = torch.quantization.quantize_dynamic(
+    # prepare models: standard (used for AOT implementation), jit, jit+quantization
+    nn_model.model_jit = nn_model.model
+
+    nn_model.model_jit_q = torch.quantization.quantize_dynamic(
         nn_model.model, qconfig_spec={torch.nn.Linear}, dtype=torch.qint8
     )
 
-    nn_model.model = torch.jit.script(nn_model.model)
-    nn_model.model = torch.jit.optimize_for_inference(nn_model.model)
+    nn_model.model_jit = torch.jit.script(nn_model.model_jit)
+    nn_model.model_jit = torch.jit.optimize_for_inference(nn_model.model_jit)
 
-    nn_model.modelq = torch.jit.script(nn_model.modelq)
-    nn_model.modelq = torch.jit.optimize_for_inference(nn_model.modelq)
+    nn_model.model_jit_q = torch.jit.script(nn_model.model_jit_q)
+    nn_model.model_jit_q = torch.jit.optimize_for_inference(nn_model.model_jit_q)
 
+    nn_model.update_aot_lambda()
+    #nn_model.model.eval()
     # Initial state
     q_0 = torch.zeros(DOF).to(**params)
     q_f = torch.zeros(DOF).to(**params)
@@ -66,8 +71,8 @@ def main_int():
     obs = torch.tensor([[6, 2, 0, .5],
                         [4, -1, 0, .5],
                         [5, 0, 0, .5]]).to(**params)
-    n_dummy = 20
-    dummy_obs = torch.hstack((torch.zeros(n_dummy, 3)+5, torch.zeros(n_dummy, 1)+0.1)).to(**params)
+    n_dummy = 1
+    dummy_obs = torch.hstack((torch.zeros(n_dummy, 3)+6, torch.zeros(n_dummy, 1)+0.1)).to(**params)
     obs = torch.vstack((obs, dummy_obs))
     # Plotting
     r_h = init_robot_plot(dh_params, -10, 10, -10, 10)
@@ -89,9 +94,12 @@ def main_int():
     mppi.Policy.policy_upd_rate = 0.5
     mppi.dst_thr = 0.4
     # jit warmup
-    for i in range(200):
-        _ = mppi.nn_model.model.forward(torch.randn(N_traj*obs.shape[0], 10).to(**params))
-        _, _, _ = mppi.nn_model.dist_grad_closest(torch.randn(N_traj, 10).to(**params))
+    for i in range(20):
+        _, _, _ = mppi.propagate()
+    #     _ = mppi.nn_model.model_jit.forward(torch.randn(N_traj*obs.shape[0], 10).to(**params))
+    #     _ = mppi.nn_model.model_jit_q.forward(torch.randn(N_traj*obs.shape[0], 10).to(**params))
+    #     _, _, _ = mppi.nn_model.dist_grad_closest(torch.randn(N_traj, 10).to(**params))
+    #     _, _, _ = mppi.nn_model.dist_grad_closest_aot(torch.randn(N_traj, 10).to(**params))
 
     t0 = time.time()
     print('Init time: %4.2fs' % (t0 - t00))
@@ -143,7 +151,7 @@ def main_int():
                   f' Kernel count:{mppi.Policy.n_kernels:4d}')
     td = time.time() - t0
     print('Time: ', td)
-    print('Time per iteration: ', td / N_ITER, 'Hz: ', 1 / (td / N_ITER))
+    print('Time per iteration: ', td / N_ITER, 'Hz: ', 1 / (td / (N_ITER)))
     print('Time per rollout: ', td / (N_ITER * N_traj))
     print('Time per rollout step: ', td / (N_ITER * N_traj * dt_H))
     #print(torch_profiler.key_averages().table(sort_by="cpu_time_total", row_limit=20))

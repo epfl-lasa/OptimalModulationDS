@@ -128,7 +128,7 @@ class MPPI:
 
         with record_function("TAG: evaluate NN_2 (forward pass)"):
             # doing single forward pass to figure out the closest obstacle for each configuration
-            nn_dist = self.nn_model.model.forward(nn_input[:, 0:-1])
+            nn_dist = self.nn_model.model_jit.forward(nn_input[:, 0:-1])
 
         with record_function("TAG: evaluate NN_3 (get closest obstacle)"):
             # rebuilding input tensor to only include closest obstacles
@@ -141,14 +141,18 @@ class MPPI:
         with record_function("TAG: evaluate NN_4 (forward+backward pass)"):
             # forward + backward pass to get gradients for closest obstacles
             # nn_dist, nn_grad, nn_minidx = self.nn_model.compute_signed_distance_wgrad(nn_input[:, 0:-1], 'closest')
-            nn_dist, nn_grad, nn_minidx = self.nn_model.dist_grad_closest(nn_input[:, 0:-1])
+            # nn_dist, nn_grad, nn_minidx = self.nn_model.dist_grad_closest(nn_input[:, 0:-1])
+            # self.nn_grad = nn_grad.squeeze(2)[:, 0:self.n_dof]
+
+            nn_dist, nn_grad, nn_minidx = self.nn_model.dist_grad_closest_aot(nn_input[:, 0:-1])
+            self.nn_grad = nn_grad[:, 0:self.n_dof]
 
         with record_function("TAG: evaluate NN_5 (process outputs)"):
             # cleaning up to get distances and gradients for closest obstacles
             nn_dist -= nn_input[:, -1].unsqueeze(1)  # subtract radius and some threshold
             nn_dist = nn_dist[self.traj_range.unsqueeze(1), nn_minidx.unsqueeze(1)]
             # get gradients
-            self.nn_grad = nn_grad.squeeze(2)[:, 0:self.n_dof]
+
             distance = nn_dist.squeeze(1)
         return distance, self.nn_grad
 
