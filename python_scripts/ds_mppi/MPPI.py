@@ -112,8 +112,9 @@ class MPPI:
                 nominal_velocity_norm = torch.norm(nominal_velocity, dim=1).reshape(-1, 1)
                 policy_velocity = policy_velocity * nominal_velocity_norm
                 mod_velocity = (M @ (nominal_velocity + policy_velocity).unsqueeze(2)).squeeze()
+                # normalization
                 mod_velocity_norm = torch.norm(mod_velocity, dim=1).reshape(-1, 1)
-                mod_velocity_norm[mod_velocity_norm <= 1e-1] = 1
+                mod_velocity_norm[mod_velocity_norm <= 1] = 1
                 mod_velocity = torch.nan_to_num(mod_velocity / mod_velocity_norm)
                 # slow down for collision case
                 mod_velocity[distance < 0] *= 0.1
@@ -132,7 +133,8 @@ class MPPI:
         with record_function("TAG: evaluate NN_2 (forward pass)"):
             # doing single forward pass to figure out the closest obstacle for each configuration
             nn_dist = self.nn_model.model_jit.forward(nn_input[:, 0:-1])
-            nn_dist = nn_dist/100 # scale down to meters
+            if self.nn_model.out_channels == 9:
+                nn_dist = nn_dist/100   # scale down to meters
         with record_function("TAG: evaluate NN_3 (get closest obstacle)"):
             # rebuilding input tensor to only include closest obstacles
             nn_dist -= nn_input[:, -1].unsqueeze(1)  # subtract radius
@@ -149,6 +151,8 @@ class MPPI:
 
             nn_dist, nn_grad, nn_minidx = self.nn_model.dist_grad_closest_aot(nn_input[:, 0:-1])
             self.nn_grad = nn_grad[:, 0:self.n_dof]
+            if self.nn_model.out_channels == 9:
+                nn_dist = nn_dist/100   # scale down to meters
 
         with record_function("TAG: evaluate NN_5 (process outputs)"):
             # cleaning up to get distances and gradients for closest obstacles
@@ -172,6 +176,17 @@ class MPPI:
         self.cur_cost = self.Cost.evaluate_costs(self.all_traj, self.closest_dist_all)
         return self.cur_cost
 
+    def get_qdot(self, mode='best'):
+        qdot = 0
+        if mode == 'best':
+            best_idx = torch.argmin(self.cur_cost)
+            qdot = self.qdot[best_idx, :]
+        elif mode == 'weighted':
+            beta = self.cur_cost.mean() / 50
+            w = torch.exp(-1 / beta * self.cur_cost)
+            w = w / w.sum()
+            qdot = torch.sum(w.unsqueeze(1) * self.qdot, dim=0)
+        return qdot
     def shift_policy_means(self):
         beta = self.cur_cost.mean() / 50
         w = torch.exp(-1 / beta * self.cur_cost)

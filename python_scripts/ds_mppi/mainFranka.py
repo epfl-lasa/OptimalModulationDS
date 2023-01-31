@@ -12,12 +12,6 @@ else:
     params = {'device': 'cuda:0', 'dtype': torch.float32}
 
 def main_loop(gym_instance):
-    # ########################################
-    # ###     GYM AND SIMULATION SETUP     ###
-    # ########################################
-    world_instance, robot_sim, robot_ptr, env_ptr = deploy_world_robot(gym_instance, params)
-
-
     ########################################
     ###        CONTROLLER SETUP          ###
     ########################################
@@ -44,14 +38,8 @@ def main_loop(gym_instance):
     nn_model.update_aot_lambda()
     #nn_model.model.eval()
     # Initial state
-    # q_0 = torch.zeros(DOF).to(**params)
-    # q_f = torch.zeros(DOF).to(**params)
-    # q_0[0] = torch.pi / 2
-    # q_f[0] = -torch.pi / 2
-    # q_0 = torch.tensor([-0.1, -0.08, -1.5, -1.6, -0.16,  1.6, -0.75]).to(**params)
-    # q_f = torch.tensor([2.1, -0.08, -1.5, -1.6, -0.16,  1.6, -0.75]).to(**params)
-    q_0 = torch.tensor([-1.5, 0, 0, -pi/2, 0, pi/2,  0]).to(**params)
-    q_f = torch.tensor([1.5, 0, 0, -pi/2, 0, pi/2,  0]).to(**params)
+    q_0 = torch.tensor([-1.1, -0.08, 0, -2, -0.16,  1.6, -0.75]).to(**params)
+    q_f = torch.tensor([1.1, -0.08, 0, -2, -0.16,  1.6, -0.75]).to(**params)
 
     # Robot parameters
     dh_a = torch.zeros(DOF + 1).to(**params)
@@ -60,23 +48,26 @@ def main_loop(gym_instance):
     dh_d = torch.tensor([0.333, 0, 0.316, 0, 0.384, 0, 0, 0.107])       # "d" in matlab
     dh_alpha = torch.tensor([0, -pi/2, pi/2, pi/2, -pi/2, pi/2, pi/2, 0])  # "alpha" in matlab
     dh_params = torch.vstack((dh_d, dh_a*0, dh_a, dh_alpha)).T          # (d, theta, a (or r), alpha)
-    #dh_params = torch.vstack((dh_a * 0, dh_a * 0, dh_a, dh_a * 0)).T
     # Obstacle spheres (x, y, z, r)
-    obs = torch.tensor([[6, 2, 0, .5],
-                        [4, -1, 0, .5],
-                        [5, 0, 0, .5]]).to(**params)
+    # obs = torch.tensor([[6, 2, 0, .5],
+    #                     [4, -1, 0, .5],
+    #                     [5, 0, 0, .5]]).to(**params)
+
+    obs = torch.tensor([[0.4, 0, 0.00, .05],
+                        [0.4, 0, 0.55, .05],
+                        [0.4, 0, 0.60, .05],
+                        [0.4, 0, 0.65, .05],
+                        [0.4, 0, 0.70, .05]]).to(**params)
+
     n_dummy = 1
-    dummy_obs = torch.hstack((torch.zeros(n_dummy, 3)+6, torch.zeros(n_dummy, 1)+0.1)).to(**params)
+    dummy_obs = torch.hstack((torch.zeros(n_dummy, 3)+10, torch.zeros(n_dummy, 1)+0.1)).to(**params)
     obs = torch.vstack((obs, dummy_obs))
-    # Plotting
-    r_h = init_robot_plot(dh_params, -10, 10, -10, 10)
-    c_h = init_kernel_means(100)
-    o_h_arr = plot_obs_init(obs)
     # Integration parameters
     A = -1 * torch.diag(torch.ones(DOF)).to(**params)
-    N_traj = 50
-    dt_H = 20
-    dt = 0.2
+    N_traj = 20
+    dt_H = 10
+    dt = 0.1
+    dt_sim = 0.01
     N_ITER = 0
     # kernel adding thresholds
     thr_dist = 0.5
@@ -85,15 +76,26 @@ def main_loop(gym_instance):
     mppi.Policy.sigma_c_nominal = 0.3
     mppi.Policy.alpha_s = 0.3
     mppi.Policy.policy_upd_rate = 0.5
-    mppi.dst_thr = 0.4
+    mppi.dst_thr = 0.05 # 5 cm
     # jit warmup
     for i in range(20):
         _, _, _ = mppi.propagate()
 
+    # ########################################
+    # ###     GYM AND SIMULATION SETUP     ###
+    # ########################################
+    world_instance, robot_sim, robot_ptr, env_ptr = deploy_world_robot(gym_instance, params)
+    w_T_r = copy.deepcopy(robot_sim.spawn_robot_pose)
+
+    obs_list = []
+    for i, sphere in enumerate(obs):
+        tmpObsDict = deploy_sphere(sphere, gym_instance, w_T_r, 'sphere_%d'%(i), params)
+        obs_list.append(tmpObsDict)
+
     t0 = time.time()
     print('Init time: %4.2fs' % (t0 - t00))
 
-    while torch.norm(mppi.q_cur - q_f) > 0.1:
+    while torch.norm(mppi.q_cur - q_f)+1 > 0.001:
         t_iter = time.time()
         # Sample random policies
         mppi.Policy.sample_policy()
@@ -116,19 +118,15 @@ def main_loop(gym_instance):
             #upd_r_h(kernel_fk.to('cpu'), c_h[(mppi.Policy.n_kernels - 1) % len(c_h)])
 
         # Update current robot state
-        mppi.q_cur = all_traj[best_idx, 1, :]
+        qdot = mppi.get_qdot('best')
+        mppi.q_cur = mppi.q_cur + dt_sim * qdot
         cur_fk, _ = numeric_fk_model(mppi.q_cur, dh_params, 10)
 
         gym_instance.step()
         q_des = mppi.q_cur
-        dq_des = q_des * 0
+        dq_des = qdot * 0
         robot_sim.set_robot_state(q_des, dq_des, env_ptr, robot_ptr)
 
-        upd_r_h(cur_fk.to('cpu'), r_h)
-        r_h.set_zorder(10000)
-        # obs[0, 0] += 0.03
-        # plot_obs_update(o_h_arr, obs)
-        plt.pause(0.0001)
         N_ITER += 1
         if N_ITER > 10000:
             break
@@ -143,7 +141,7 @@ def main_loop(gym_instance):
     print('Time per rollout: ', td / (N_ITER * N_traj))
     print('Time per rollout step: ', td / (N_ITER * N_traj * dt_H))
     #print(torch_profiler.key_averages().table(sort_by="cpu_time_total", row_limit=20))
-    plt.pause(10)
+    time.sleep(10)
 
 
 if __name__ == '__main__':

@@ -41,3 +41,26 @@ def deploy_world_robot(gym_instance, params):
     w_T_robot[:3, :3] = rot[0]
     world_instance = World(gym, sim, env_ptr, world_params, w_T_r=w_T_r)
     return world_instance, robot_sim, robot_ptr, env_ptr
+
+def deploy_sphere(sphere_data, gym_instance, w_T_r, sph_name, params):
+    env_ptr = gym_instance.env_list[0]
+    sphere_dict = dict()
+    sphere_dict['position'] = sphere_data[0:3]
+    sphere_dict['amplitude'] = 0
+    sphere_dict['velocity'] = 0
+    sphere_dict['radius'] = sphere_data[3]
+    sphere_dict['pose'] = gymapi.Transform()
+    sphere_dict['pose'].p = gymapi.Vec3(sphere_data[0], sphere_data[1], sphere_data[2])
+    sphere_dict['pose'].r = gymapi.Quat(0, 0, 0, 1)
+    sphere_dict['name'] = sph_name
+    asset_options = gymapi.AssetOptions()
+    asset_options.armature = 0.001
+    asset_options.fix_base_link = True
+    asset_options.thickness = 0.002
+    sphere_dict['obs_asset'] = gym_instance.gym.create_sphere(gym_instance.sim, sphere_dict['radius'], asset_options)
+    sphere_dict['obs_handle'] = gym_instance.gym.create_actor(env_ptr, sphere_dict['obs_asset'], w_T_r * sphere_dict['pose'],
+                                                 sphere_dict['name'], 2, 2, 0)
+    sphere_dict['obs_body_handle'] = gym_instance.gym.get_actor_rigid_body_handle(env_ptr, sphere_dict['obs_handle'], 0)
+    gym_instance.gym.set_rigid_body_color(env_ptr, sphere_dict['obs_handle'], 0, gymapi.MESH_VISUAL_AND_COLLISION,
+                             gymapi.Vec3(0.8, 0.2, 0.2))
+    return sphere_dict
