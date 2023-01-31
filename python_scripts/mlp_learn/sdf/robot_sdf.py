@@ -151,7 +151,7 @@ class RobotSdfCollisionNet():
     def functorch_vjp(self, points):
         dists, vjp_fn = vjp(self.model.forward, points)
         minIdx = torch.argmin(dists, dim=1)
-        grad_v = torch.zeros(points.shape[0], points.shape[1] - 3).to(points.device)
+        grad_v = torch.zeros(points.shape[0], self.out_channels).to(points.device)
         grad_v[list(range(points.shape[0])), minIdx] = 1
         return dists, vjp_fn(grad_v)[0], minIdx
 

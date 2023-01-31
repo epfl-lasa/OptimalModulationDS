@@ -132,7 +132,7 @@ class MPPI:
         with record_function("TAG: evaluate NN_2 (forward pass)"):
             # doing single forward pass to figure out the closest obstacle for each configuration
             nn_dist = self.nn_model.model_jit.forward(nn_input[:, 0:-1])
-
+            nn_dist = nn_dist/100 # scale down to meters
         with record_function("TAG: evaluate NN_3 (get closest obstacle)"):
             # rebuilding input tensor to only include closest obstacles
             nn_dist -= nn_input[:, -1].unsqueeze(1)  # subtract radius
