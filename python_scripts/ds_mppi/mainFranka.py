@@ -47,36 +47,48 @@ def main_loop(gym_instance):
     dh_a = torch.tensor([0, 0, 0, 0.0825, -0.0825, 0, 0.088, 0])        # "r" in matlab
     dh_d = torch.tensor([0.333, 0, 0.316, 0, 0.384, 0, 0, 0.107])       # "d" in matlab
     dh_alpha = torch.tensor([0, -pi/2, pi/2, pi/2, -pi/2, pi/2, pi/2, 0])  # "alpha" in matlab
-    dh_params = torch.vstack((dh_d, dh_a*0, dh_a, dh_alpha)).T          # (d, theta, a (or r), alpha)
+    dh_params = torch.vstack((dh_d, dh_a*0, dh_a, dh_alpha)).T.to(**params)          # (d, theta, a (or r), alpha)
     # Obstacle spheres (x, y, z, r)
     # obs = torch.tensor([[6, 2, 0, .5],
     #                     [4, -1, 0, .5],
     #                     [5, 0, 0, .5]]).to(**params)
 
-    obs = torch.tensor([[0.4, 0, 0.00, .05],
+    obs = torch.tensor([[0.4, 0, 0.50, .05], #vertical bar
                         [0.4, 0, 0.55, .05],
                         [0.4, 0, 0.60, .05],
                         [0.4, 0, 0.65, .05],
-                        [0.4, 0, 0.70, .05]]).to(**params)
+                        [0.4, 0, 0.70, .05],
+                        [0.4, 0, 0.75, .05],
+                        [0.4, 0, 0.80, .05],
+                        # [0.35, 0, 0.80, .05], # top horizontal
+                        # [0.30, 0, 0.80, .05],
+                        # [0.25, 0, 0.80, .05],
+                        # [0.20, 0, 0.80, .05],
+                        # [0.15, 0, 0.80, .05],
+                        # [0.35, 0, 0.45, .05], # bottom horizontal
+                        # [0.30, 0, 0.45, .05],
+                        # [0.25, 0, 0.45, .05],
+                        # [0.20, 0, 0.45, .05],
+                        ]).to(**params)
 
     n_dummy = 1
     dummy_obs = torch.hstack((torch.zeros(n_dummy, 3)+10, torch.zeros(n_dummy, 1)+0.1)).to(**params)
     obs = torch.vstack((obs, dummy_obs))
     # Integration parameters
     A = -1 * torch.diag(torch.ones(DOF)).to(**params)
-    N_traj = 20
-    dt_H = 10
-    dt = 0.1
+    N_traj = 50
+    dt_H = 5
+    dt = 0.3
     dt_sim = 0.01
     N_ITER = 0
     # kernel adding thresholds
-    thr_dist = 0.5
-    thr_rbf = 0.03
+    thr_dist = 0.03
+    thr_rbf = 0.01
     mppi = MPPI(q_0, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a, nn_model)
     mppi.Policy.sigma_c_nominal = 0.3
     mppi.Policy.alpha_s = 0.3
     mppi.Policy.policy_upd_rate = 0.5
-    mppi.dst_thr = 0.05 # 5 cm
+    mppi.dst_thr = 0.03
     # jit warmup
     for i in range(20):
         _, _, _ = mppi.propagate()
@@ -86,6 +98,7 @@ def main_loop(gym_instance):
     # ########################################
     world_instance, robot_sim, robot_ptr, env_ptr = deploy_world_robot(gym_instance, params)
     w_T_r = copy.deepcopy(robot_sim.spawn_robot_pose)
+    R_tens = getTensTransform(w_T_r)
 
     obs_list = []
     for i, sphere in enumerate(obs):
@@ -114,8 +127,9 @@ def main_loop(gym_instance):
         if len(kernel_candidates) > 0:
             rand_idx = torch.randint(kernel_candidates.shape[0], (1,))
             mppi.Policy.add_kernel(kernel_candidates[rand_idx[0]])
-            #kernel_fk, _ = numeric_fk_model(kernel_candidates[rand_idx[0]], dh_params, 10)
-            #upd_r_h(kernel_fk.to('cpu'), c_h[(mppi.Policy.n_kernels - 1) % len(c_h)])
+            kernel_fk, _ = numeric_fk_model(kernel_candidates[rand_idx[0]], dh_params, 10)
+            fk_arr = kernel_fk.flatten(0, 1) @ R_tens[0:3, 0:3] + R_tens[0:3,3]
+            gym_instance.draw_lines(fk_arr, color=[1, 1, 1])
 
         # Update current robot state
         qdot = mppi.get_qdot('best')

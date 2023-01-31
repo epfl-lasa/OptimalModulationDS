@@ -64,3 +64,13 @@ def deploy_sphere(sphere_data, gym_instance, w_T_r, sph_name, params):
     gym_instance.gym.set_rigid_body_color(env_ptr, sphere_dict['obs_handle'], 0, gymapi.MESH_VISUAL_AND_COLLISION,
                              gymapi.Vec3(0.8, 0.2, 0.2))
     return sphere_dict
+
+def getTensTransform(w_T):
+    tens_transform = torch.eye(4)
+    quat = torch.tensor([w_T.r.w, w_T.r.x, w_T.r.y, w_T.r.z]).unsqueeze(0)
+    rot = quaternion_to_matrix(quat)
+    tens_transform[0, 3] = w_T.p.x
+    tens_transform[1, 3] = w_T.p.y
+    tens_transform[2, 3] = w_T.p.z
+    tens_transform[:3, :3] = rot[0]
+    return tens_transform
