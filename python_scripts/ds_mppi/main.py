@@ -69,7 +69,7 @@ def main_int():
     dh_params = torch.vstack((dh_a * 0, dh_a * 0, dh_a, dh_a * 0)).T
     # Obstacle spheres (x, y, z, r)
     obs = torch.tensor([[6, 2, 0, .5],
-                        [4, -1, 0, .5],
+                        [4.5, -1, 0, .5],
                         [5, 0, 0, .5]]).to(**params)
     n_dummy = 1
     dummy_obs = torch.hstack((torch.zeros(n_dummy, 3)+6, torch.zeros(n_dummy, 1)+0.1)).to(**params)
@@ -88,7 +88,7 @@ def main_int():
     N_ITER = 0
     # kernel adding thresholds
     thr_dist = 0.5
-    thr_rbf = 0.03
+    thr_rbf = 1e-3
     mppi = MPPI(q_0, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a, nn_model)
     mppi.Policy.sigma_c_nominal = 0.3
     mppi.Policy.alpha_s = 0.3

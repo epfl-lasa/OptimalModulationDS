@@ -76,7 +76,7 @@ def main_loop(gym_instance):
 
     # T-bar
 
-    t1 = torch.tensor([0.35, -0.3, 0.75, .05])
+    t1 = torch.tensor([0.4, -0.3, 0.75, .05])
     t2 = t1 + torch.tensor([0, 0.6, 0, 0])
     top_bar = t1 + torch.linspace(0, 1, 10).reshape(-1, 1) * (t2 - t1)
     t3 = t1 + 0.5 * (t2 - t1)
@@ -105,6 +105,7 @@ def main_loop(gym_instance):
     mppi.Policy.alpha_s = 0.3
     mppi.Policy.policy_upd_rate = 0.5
     mppi.dst_thr = 0.03
+    mppi.ker_thr = 0.1
     # jit warmup
     for i in range(20):
         _, _, _ = mppi.propagate()
@@ -139,7 +140,7 @@ def main_loop(gym_instance):
             cost = mppi.get_cost()
             mppi.shift_policy_means()
         # Check trajectory for new kernel candidates and add policy kernels
-        kernel_candidates = check_traj_for_kernels(all_traj, closests_dist_all, kernel_val_all, thr_dist, thr_rbf)
+        kernel_candidates = check_traj_for_kernels(all_traj, closests_dist_all, kernel_val_all, thr_dist, mppi.ker_thr)
         if len(kernel_candidates) > 0:
             rand_idx = torch.randint(kernel_candidates.shape[0], (1,))
             mppi.Policy.add_kernel(kernel_candidates[rand_idx[0]])
@@ -178,6 +179,7 @@ def main_loop(gym_instance):
         print(f'Iteration:{N_ITER:4d}, Time:{t_iter:4.2f}, Frequency:{1/t_iter:4.2f},',
               f' Avg. frequency:{N_ITER/(time.time()-t0):4.2f}',
               f' Kernel count:{mppi.Policy.n_kernels:4d}')
+        print('Position difference: %4.3f'% (mppi.q_cur - q_f).norm().cpu())
     td = time.time() - t0
     print('Time: ', td)
     print('Time per iteration: ', td / N_ITER, 'Hz: ', 1 / (td / (N_ITER)))

@@ -48,6 +48,7 @@ class MPPI:
         self.policy_upd_rate = 0.1
         self.dst_thr = 0.5
         self.qdot = torch.zeros((self.N_traj, self.n_dof)).to(**self.tensor_args)
+        self.ker_thr = 0.1
     def reset_tensors(self):
         self.all_traj = self.all_traj * 0
         self.closest_dist_all = 100 + self.closest_dist_all * 0
@@ -63,22 +64,23 @@ class MPPI:
         P = self.Policy
         for i in range(1, self.dt_H):
             with record_function("TAG: Nominal vector field"):
-                q_cur = self.all_traj[:, i, :]
                 q_prev = self.all_traj[:, i - 1, :]
                 # calculate nominal vector field
                 nominal_velocity = (q_prev - self.qf) @ self.A
             # apply policies
             with record_function("TAG: Apply policies"):
                 kernel_value = eval_rbf(q_prev, P.mu_tmp[:, 0:P.n_kernels], P.sigma_tmp[:, 0:P.n_kernels])
-                kernel_value[kernel_value < 1e-3] = 0
-                policy_value = torch.sum(P.alpha_tmp[:, 0:P.n_kernels] * kernel_value, 1)
+                kernel_value[kernel_value < self.ker_thr] = 0
+                ker_w = torch.exp(50*kernel_value)
+                self.ker_w = ker_w / torch.sum(ker_w, 1).unsqueeze(1) #normalize kernel influence
+                policy_value = torch.sum(P.alpha_tmp[:, 0:P.n_kernels] * self.ker_w, 1)
                 if P.n_kernels > 0:
                     self.kernel_val_all[:, i - 1, 0:P.n_kernels] = kernel_value.reshape((self.N_traj, P.n_kernels))
             #distance calculation (NN)
             with record_function("TAG: evaluate NN"):
                 # evaluate NN
                 distance, self.nn_grad = self.distance_repulsion_nn(q_prev)
-                #distance, self.nn_grad = self.distance_repulsion_fk(q_prev)
+                #distance, self.nn_grad = self.distance_repulsion_fk(q_prev) #not implemented for Franka
                 distance -= self.dst_thr
                 self.closest_dist_all[:, i - 1] = distance
 
@@ -187,9 +189,11 @@ class MPPI:
             w = w / w.sum()
             qdot = torch.sum(w.unsqueeze(1) * self.qdot, dim=0)
         return qdot
+
     def shift_policy_means(self):
         beta = self.cur_cost.mean() / 50
         w = torch.exp(-1 / beta * self.cur_cost)
         w = w / w.sum()
-        self.Policy.update_policy(w, self.policy_upd_rate)
+        noupd_mask = self.kernel_val_all[:, :, 0:self.Policy.n_kernels].sum(1).mean(0) < 0.05
+        self.Policy.update_policy(w, self.policy_upd_rate, noupd_mask)
         return 0

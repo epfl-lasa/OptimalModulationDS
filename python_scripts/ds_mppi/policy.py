@@ -51,18 +51,32 @@ class TensorPolicyMPPI:
                                                 + self.sigma_c[:self.n_kernels]
         self.alpha_tmp[:, :self.n_kernels] = self.alpha_tmp[:, :self.n_kernels].normal_(mean=0, std=self.alpha_s) \
                                                 + self.alpha_c[:self.n_kernels]
-    def update_policy(self, w, upd_rate):
+    def update_policy(self, w, upd_rate, noupd_mask=None):
         # Update policy parameters, use current state(mu_c, sigma_c and alpha_c)
         # and a sampled policy (mu_tmp, sigma_tmp, alpha_tmp) with weights w
-        mu_cur_sum = torch.sum(w[:, None, None] * self.mu_tmp, 0)
-        sigma_cur_sum = torch.sum(w[:, None] * self.sigma_tmp, 0)
-        alpha_cur_sum = torch.sum(w[:, None, None] * self.alpha_tmp, 0)
-        # Update centers
-        self.mu_c = (1 - upd_rate) * self.mu_c + upd_rate * mu_cur_sum
-        # Update standard deviations
-        self.sigma_c = (1 - upd_rate) * self.sigma_c + upd_rate * sigma_cur_sum
-        # Update weights
-        self.alpha_c = (1 - upd_rate) * self.alpha_c + upd_rate * alpha_cur_sum
+        mu_cur_sum = torch.sum(w[:, None, None] * self.mu_tmp[:, :self.n_kernels], 0)
+        sigma_cur_sum = torch.sum(w[:, None] * self.sigma_tmp[:, :self.n_kernels], 0)
+        alpha_cur_sum = torch.sum(w[:, None, None] * self.alpha_tmp[:, :self.n_kernels], 0)
+
+        if self.n_kernels > 0:
+            # prepare upd rate tensor
+            upd_tens = upd_rate*torch.ones(self.n_kernels, **self.params)
+            if noupd_mask is not None:
+                upd_tens[noupd_mask] = 0.0
+            # Update centers
+            # scalar upd_rate
+            # self.mu_c[0:self.n_kernels] = (1 - upd_rate) * self.mu_c[0:self.n_kernels] + upd_rate * mu_cur_sum
+            # # Update standard deviations
+            # self.sigma_c[0:self.n_kernels] = (1 - upd_rate) * self.sigma_c[0:self.n_kernels] + upd_rate * sigma_cur_sum
+            # # Update weights
+            # self.alpha_c[0:self.n_kernels] = (1 - upd_rate) * self.alpha_c[0:self.n_kernels] + upd_rate * alpha_cur_sum
+
+            #tensor upd_rate
+            self.mu_c[0:self.n_kernels] = (1 - upd_tens[:, None]) * self.mu_c[0:self.n_kernels] + upd_tens[:, None] * mu_cur_sum
+            # Update standard deviations
+            self.sigma_c[0:self.n_kernels] = (1 - upd_tens) * self.sigma_c[0:self.n_kernels] + upd_tens * sigma_cur_sum
+            # Update weights
+            self.alpha_c[0:self.n_kernels] = (1 - upd_tens[:, None]) * self.alpha_c[0:self.n_kernels] + upd_tens[:, None] * alpha_cur_sum
 
     def add_kernel(self, q):
         # Add a new kernel centered at q
