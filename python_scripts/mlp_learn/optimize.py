@@ -4,6 +4,7 @@ from sdf.robot_sdf import RobotSdfCollisionNet
 from functorch import vmap, jacrev, vjp
 from functorch.compile import aot_function, ts_compile
 from torch.autograd.functional import jacobian
+from sdf_transformer import *
 
 tensor_args = {'device': 'cpu', 'dtype': torch.float32}
 
@@ -30,10 +31,12 @@ nn_model = RobotSdfCollisionNet(in_channels=x.shape[1], out_channels=y.shape[1],
 nn_model.load_weights('models/' + fname, tensor_args)
 
 model = nn_model.model
-model.to(**tensor_args)
 
-model2 = nn_model.model
-model2.to(**tensor_args)
+# model = sdf_transformer(input_dim=x.shape[1], output_dim=y.shape[1],
+#                         num_layer=2, embed_dim=128, nhead=4, ff_dim=256)
+# chk = torch.load('models/t_' + fname)
+# model.load_state_dict(chk["model_state_dict"])
+model.to(**tensor_args)
 
 # model = torch.quantization.quantize_dynamic(
 #     model, qconfig_spec={torch.nn.Linear}, dtype=torch.qint8
@@ -44,11 +47,12 @@ model2.to(**tensor_args)
 # torch.backends.quantized.engine = backend
 model = torch.quantization.prepare(model, inplace=False)
 model = torch.quantization.convert(model, inplace=False)
+# model = sdf_transformer(input_dim=10, output_dim=7,
+#                         num_layer=2, embed_dim=128, nhead=2, ff_dim=128)
 
 model = torch.jit.script(model)
 model = torch.jit.optimize_for_inference(model)
-
-#nn_model.model = model
+# nn_model.model = model
 
 input_1 = x[0:1, :]
 input_2 = x[:100, :]
@@ -65,10 +69,13 @@ n_iters = 100
 nn_model.allocate_gradients(input_2.shape[0], tensor_args)
 for i in range(n_iters):
     d1, g1, i1 = nn_model.dist_grad_closest(input_2)
+    a = model.forward(input_2)
 
 t0 = time.time()
 for i in range(n_iters):
     d1, g1, i1 = nn_model.dist_grad_closest(input_2)
+    #a = nn_model.model.forward(input_2)
+    #a = model.forward(input_2)
 print('Time for 1000 samples gradient: %4.2fmus' % (1e6*(time.time()-t0)/n_iters))
 
 

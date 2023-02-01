@@ -26,6 +26,7 @@ import torch.nn.functional as F
 import numpy as np
 import time
 import yaml
+from sdf_transformer import *
 
 import os
 import matplotlib.pyplot as plt
@@ -35,11 +36,12 @@ device = torch.device('cuda', 0)
 tensor_args = {'device': device, 'dtype': torch.float32}
 q_dof = 7
 data = torch.load('datasets/%d_dof_data.pt' % q_dof).to(**tensor_args)
+# data = data[0:20000]
 data_x = data[:, 0:q_dof + 3]
 data_y = data[:, -q_dof:]
 n_size = data.shape[0]
 train_ratio = 0.98
-test_ratio = 0.01
+test_ratio = 0.001
 val_ratio = 1 - train_ratio - test_ratio
 
 idx_train = np.arange(0, int(n_size * train_ratio))
@@ -69,18 +71,25 @@ nn_model.load_weights('models/' + fname, tensor_args)
 nn_model.model.to(**tensor_args)
 
 model = nn_model.model
+
+
+# model = sdf_transformer(input_dim=x_train.shape[1], output_dim=y_train.shape[1],
+#                         num_layer=2, embed_dim=128, nhead=4, ff_dim=256)
+# chk = torch.load('models/t_' + fname)
+# model.load_state_dict(chk["model_state_dict"])
+
+model.to(**tensor_args)
 nelem = sum([param.nelement() for param in model.parameters()])
 print(repr(model))
 print("Sum of parameters:%d" % nelem)
 # time.sleep(2)
-
 # scale dataset: (disabled because of nerf features!)
 mean_x = torch.mean(x_train, dim=0) * 0.0
 std_x = torch.std(x_train, dim=0) * 0.0 + 1.0
 mean_y = torch.mean(y_train, dim=0) * 0.0
 std_y = torch.std(y_train, dim=0) * 0.0 + 1.0
 
-optimizer = torch.optim.Adam(model.parameters(), lr=2e-3)
+optimizer = torch.optim.Adam(model.parameters(), lr=2e-4)
 
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5000,
                                                        threshold=0.01, threshold_mode='rel',
@@ -101,9 +110,11 @@ for e in range(epochs):
     model.train()
     loss = []
     i = 0
+    idx_rand = torch.randperm(x_train.shape[0])[0:10000]
+    idx_rand = torch.arange(0, x_train.shape[0]-1, 1)
     with torch.cuda.amp.autocast():
-        y_pred_train = (model.forward(x_train))
-        train_loss = F.mse_loss(y_pred_train, y_train, reduction='mean')
+        y_pred_train = (model.forward(x_train[idx_rand, :]))
+        train_loss = F.mse_loss(y_pred_train, y_train[idx_rand, :], reduction='mean')
 
     scaler.scale(train_loss).backward()
     scaler.step(optimizer)
