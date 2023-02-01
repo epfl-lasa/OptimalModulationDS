@@ -114,7 +114,7 @@ class MPPI:
                 mod_velocity = (M @ (nominal_velocity + policy_velocity).unsqueeze(2)).squeeze()
                 # normalization
                 mod_velocity_norm = torch.norm(mod_velocity, dim=1).reshape(-1, 1)
-                mod_velocity_norm[mod_velocity_norm <= 1] = 1
+                mod_velocity_norm[mod_velocity_norm <= 0.1] = 1
                 mod_velocity = torch.nan_to_num(mod_velocity / mod_velocity_norm)
                 # slow down for collision case
                 mod_velocity[distance < 0] *= 0.1

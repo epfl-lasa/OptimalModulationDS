@@ -41,6 +41,9 @@ def main_loop(gym_instance):
     q_0 = torch.tensor([-1.1, -0.08, 0, -2, -0.16,  1.6, -0.75]).to(**params)
     q_f = torch.tensor([1.1, -0.08, 0, -2, -0.16,  1.6, -0.75]).to(**params)
 
+    # q_0 = torch.tensor([-1.2, 1.2, 0.9, -1.2, 0.1, 2.2, 0.4]).to(**params)
+    # q_f = torch.tensor([1.2, 1.2, -0.9, -1.2, 0.1, 2.2, 0.4]).to(**params)
+
     # Robot parameters
     dh_a = torch.zeros(DOF + 1).to(**params)
     dh_a[1:] = L  # link length
@@ -71,9 +74,22 @@ def main_loop(gym_instance):
                         # [0.20, 0, 0.45, .05],
                         ]).to(**params)
 
+    # T-bar
+
+    t1 = torch.tensor([0.35, -0.3, 0.75, .05])
+    t2 = t1 + torch.tensor([0, 0.6, 0, 0])
+    top_bar = t1 + torch.linspace(0, 1, 10).reshape(-1, 1) * (t2 - t1)
+    t3 = t1 + 0.5 * (t2 - t1)
+    t4 = t3 + torch.tensor([0, 0, -0.65, 0])
+    middle_bar = t3 + torch.linspace(0, 1, 10).reshape(-1, 1) * (t4 - t3)
+    bottom_bar = top_bar - torch.tensor([0, 0, 0.65, 0])
+    obs = torch.vstack((top_bar, middle_bar, bottom_bar))
+    obs = torch.vstack((middle_bar, bottom_bar))
+
     n_dummy = 1
     dummy_obs = torch.hstack((torch.zeros(n_dummy, 3)+10, torch.zeros(n_dummy, 1)+0.1)).to(**params)
-    obs = torch.vstack((obs, dummy_obs))
+    obs = torch.vstack((obs, dummy_obs)).to(**params)
+
     # Integration parameters
     A = -1 * torch.diag(torch.ones(DOF)).to(**params)
     N_traj = 50
@@ -107,7 +123,8 @@ def main_loop(gym_instance):
 
     t0 = time.time()
     print('Init time: %4.2fs' % (t0 - t00))
-
+    time.sleep(3)
+    all_fk_kernel = []
     while torch.norm(mppi.q_cur - q_f)+1 > 0.001:
         t_iter = time.time()
         # Sample random policies
@@ -120,7 +137,6 @@ def main_loop(gym_instance):
         with record_function("TAG: cost calculation"):
             # Calculate cost
             cost = mppi.get_cost()
-            best_idx = torch.argmin(cost)
             mppi.shift_policy_means()
         # Check trajectory for new kernel candidates and add policy kernels
         kernel_candidates = check_traj_for_kernels(all_traj, closests_dist_all, kernel_val_all, thr_dist, thr_rbf)
@@ -129,12 +145,25 @@ def main_loop(gym_instance):
             mppi.Policy.add_kernel(kernel_candidates[rand_idx[0]])
             kernel_fk, _ = numeric_fk_model(kernel_candidates[rand_idx[0]], dh_params, 10)
             fk_arr = kernel_fk.flatten(0, 1) @ R_tens[0:3, 0:3] + R_tens[0:3,3]
-            gym_instance.draw_lines(fk_arr, color=[1, 1, 1])
+            all_fk_kernel.append(fk_arr)
+
+        gym_instance.clear_lines()
 
         # Update current robot state
         qdot = mppi.get_qdot('best')
         mppi.q_cur = mppi.q_cur + dt_sim * qdot
         cur_fk, _ = numeric_fk_model(mppi.q_cur, dh_params, 10)
+        # draw lines in gym
+        # draw kernels
+        for fk in all_fk_kernel:
+            gym_instance.draw_lines(fk, color=[1, 1, 1])
+
+        # # draw best trajectory
+        # best_idx = torch.argmin(cost)
+        # all_fk_traj, _ = numeric_fk_model_vec(mppi.all_traj[best_idx:best_idx+1].view(-1, 7), dh_params, 10)
+        # all_fk_traj = all_fk_traj.view(1, -1, 3) @ R_tens[0:3, 0:3] + R_tens[0:3, 3]
+        # for fk in all_fk_traj:
+        #     gym_instance.draw_lines(fk, color=[1, 1, 1])
 
         gym_instance.step()
         q_des = mppi.q_cur
