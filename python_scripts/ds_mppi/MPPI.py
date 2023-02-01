@@ -48,7 +48,7 @@ class MPPI:
         self.policy_upd_rate = 0.1
         self.dst_thr = 0.5
         self.qdot = torch.zeros((self.N_traj, self.n_dof)).to(**self.tensor_args)
-        self.ker_thr = 0.1
+        self.ker_thr = 1e-3
     def reset_tensors(self):
         self.all_traj = self.all_traj * 0
         self.closest_dist_all = 100 + self.closest_dist_all * 0
@@ -72,7 +72,8 @@ class MPPI:
                 kernel_value = eval_rbf(q_prev, P.mu_tmp[:, 0:P.n_kernels], P.sigma_tmp[:, 0:P.n_kernels])
                 kernel_value[kernel_value < self.ker_thr] = 0
                 ker_w = torch.exp(50*kernel_value)
-                self.ker_w = ker_w / torch.sum(ker_w, 1).unsqueeze(1) #normalize kernel influence
+                ker_w[kernel_value < self.ker_thr] = 0
+                self.ker_w = torch.nan_to_num(ker_w / torch.sum(ker_w, 1).unsqueeze(1)) #normalize kernel influence
                 policy_value = torch.sum(P.alpha_tmp[:, 0:P.n_kernels] * self.ker_w, 1)
                 if P.n_kernels > 0:
                     self.kernel_val_all[:, i - 1, 0:P.n_kernels] = kernel_value.reshape((self.N_traj, P.n_kernels))
@@ -116,7 +117,7 @@ class MPPI:
                 mod_velocity = (M @ (nominal_velocity + policy_velocity).unsqueeze(2)).squeeze()
                 # normalization
                 mod_velocity_norm = torch.norm(mod_velocity, dim=1).reshape(-1, 1)
-                mod_velocity_norm[mod_velocity_norm <= 0.1] = 1
+                mod_velocity_norm[mod_velocity_norm <= 0.5] = 1
                 mod_velocity = torch.nan_to_num(mod_velocity / mod_velocity_norm)
                 # slow down for collision case
                 mod_velocity[distance < 0] *= 0.1
@@ -194,6 +195,6 @@ class MPPI:
         beta = self.cur_cost.mean() / 50
         w = torch.exp(-1 / beta * self.cur_cost)
         w = w / w.sum()
-        noupd_mask = self.kernel_val_all[:, :, 0:self.Policy.n_kernels].sum(1).mean(0) < 0.05
+        noupd_mask = self.kernel_val_all[:, :, 0:self.Policy.n_kernels].sum(1).mean(0) < self.ker_thr
         self.Policy.update_policy(w, self.policy_upd_rate, noupd_mask)
         return 0

@@ -38,12 +38,13 @@ def main_loop(gym_instance):
     nn_model.update_aot_lambda()
     #nn_model.model.eval()
     # Initial state
-    q_0 = torch.tensor([-1.1, -0.08, 0, -2, -0.16,  1.6, -0.75]).to(**params)
-    q_f = torch.tensor([1.1, -0.08, 0, -2, -0.16,  1.6, -0.75]).to(**params)
+    q_0 = torch.tensor([-1.2, -0.08, 0, -2, -0.16,  1.6, -0.75]).to(**params)
+    q_f = torch.tensor([1.2, -0.08, 0, -2, -0.16,  1.6, -0.75]).to(**params)
 
     # q_0 = torch.tensor([-1.2, 1.2, 0.9, -1.2, 0.1, 2.2, 0.4]).to(**params)
     # q_f = torch.tensor([1.2, 1.2, -0.9, -1.2, 0.1, 2.2, 0.4]).to(**params)
-
+    # q_0 = torch.tensor([-0.29, -0.12, -0.71, -2.46, 0.73, 1.88, 0.44]).to(**params)
+    # q_f = torch.tensor([0.46, -0.07, 0.60, -2.29, -0.68, 1.88, 0.44]).to(**params)
     # Robot parameters
     dh_a = torch.zeros(DOF + 1).to(**params)
     dh_a[1:] = L  # link length
@@ -105,10 +106,7 @@ def main_loop(gym_instance):
     mppi.Policy.alpha_s = 0.3
     mppi.Policy.policy_upd_rate = 0.5
     mppi.dst_thr = 0.03
-    mppi.ker_thr = 0.1
-    # jit warmup
-    for i in range(20):
-        _, _, _ = mppi.propagate()
+    mppi.ker_thr = 0.01
 
     # ########################################
     # ###     GYM AND SIMULATION SETUP     ###
@@ -122,9 +120,20 @@ def main_loop(gym_instance):
         tmpObsDict = deploy_sphere(sphere, gym_instance, w_T_r, 'sphere_%d'%(i), params)
         obs_list.append(tmpObsDict)
 
+    ########################################
+    ###     RUN MPPI AND SIMULATE        ###
+    ########################################
+    # warmup gym and jit
+    for i in range(20):
+        mppi.Policy.sample_policy()
+        _, _, _ = mppi.propagate()
+        gym_instance.step()
+        robot_sim.set_robot_state(mppi.q_cur, mppi.q_cur*0, env_ptr, robot_ptr)
+        numeric_fk_model(mppi.q_cur, dh_params, 10)
+
+    print('Init time: %4.2fs' % (time.time() - t00))
+    time.sleep(1)
     t0 = time.time()
-    print('Init time: %4.2fs' % (t0 - t00))
-    time.sleep(3)
     all_fk_kernel = []
     while torch.norm(mppi.q_cur - q_f)+1 > 0.001:
         t_iter = time.time()
