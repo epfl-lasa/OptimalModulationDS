@@ -77,7 +77,7 @@ def main_loop(gym_instance):
 
     # T-bar
 
-    t1 = torch.tensor([0.4, -0.3, 0.75, .05])
+    t1 = torch.tensor([0.3, -0.3, 0.75, .04])
     t2 = t1 + torch.tensor([0, 0.6, 0, 0])
     top_bar = t1 + torch.linspace(0, 1, 10).reshape(-1, 1) * (t2 - t1)
     t3 = t1 + 0.5 * (t2 - t1)
@@ -85,7 +85,8 @@ def main_loop(gym_instance):
     middle_bar = t3 + torch.linspace(0, 1, 10).reshape(-1, 1) * (t4 - t3)
     bottom_bar = top_bar - torch.tensor([0, 0, 0.65, 0])
     obs = torch.vstack((top_bar, middle_bar, bottom_bar))
-    obs = torch.vstack((middle_bar, bottom_bar))
+    # obs = torch.vstack((middle_bar, bottom_bar))
+    # obs = middle_bar
 
     n_dummy = 1
     dummy_obs = torch.hstack((torch.zeros(n_dummy, 3)+10, torch.zeros(n_dummy, 1)+0.1)).to(**params)
@@ -95,18 +96,18 @@ def main_loop(gym_instance):
     A = -1 * torch.diag(torch.ones(DOF)).to(**params)
     N_traj = 50
     dt_H = 5
-    dt = 0.3
+    dt = 0.5
     dt_sim = 0.01
     N_ITER = 0
     # kernel adding thresholds
-    thr_dist = 0.03
+    thr_dist = 0.00
     thr_rbf = 0.01
     mppi = MPPI(q_0, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a, nn_model)
     mppi.Policy.sigma_c_nominal = 0.3
     mppi.Policy.alpha_s = 0.3
     mppi.Policy.policy_upd_rate = 0.5
-    mppi.dst_thr = 0.03
-    mppi.ker_thr = 0.01
+    mppi.dst_thr = 0.001
+    mppi.ker_thr = 1e-2
 
     # ########################################
     # ###     GYM AND SIMULATION SETUP     ###
@@ -153,7 +154,7 @@ def main_loop(gym_instance):
         if len(kernel_candidates) > 0:
             rand_idx = torch.randint(kernel_candidates.shape[0], (1,))
             mppi.Policy.add_kernel(kernel_candidates[rand_idx[0]])
-            kernel_fk, _ = numeric_fk_model(kernel_candidates[rand_idx[0]], dh_params, 10)
+            kernel_fk, _ = numeric_fk_model(kernel_candidates[rand_idx[0]], dh_params, 3)
             fk_arr = kernel_fk.flatten(0, 1) @ R_tens[0:3, 0:3] + R_tens[0:3,3]
             all_fk_kernel.append(fk_arr)
 
@@ -162,11 +163,13 @@ def main_loop(gym_instance):
         # Update current robot state
         qdot = mppi.get_qdot('best')
         mppi.q_cur = mppi.q_cur + dt_sim * qdot
-        cur_fk, _ = numeric_fk_model(mppi.q_cur, dh_params, 10)
+        cur_fk, _ = numeric_fk_model(mppi.q_cur, dh_params, 3)
+        goal_fk, _ = numeric_fk_model(q_f, dh_params, 3)
         # draw lines in gym
         # draw kernels
         for fk in all_fk_kernel:
             gym_instance.draw_lines(fk, color=[1, 1, 1])
+        gym_instance.draw_lines(goal_fk.flatten(0, 1) @ R_tens[0:3, 0:3] + R_tens[0:3, 3], color=[0.6, 1, 0.6])
 
         # # draw best trajectory
         # best_idx = torch.argmin(cost)

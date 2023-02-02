@@ -81,8 +81,8 @@ def main_int():
     # Integration parameters
     A = -1 * torch.diag(torch.ones(DOF)).to(**params)
     N_traj = 50
-    dt_H = 20
-    dt = 0.2
+    dt_H = 5
+    dt = 0.4
     dt_sim = 0.05
     q_cur = q_0
     N_ITER = 0
@@ -93,7 +93,7 @@ def main_int():
     mppi.Policy.sigma_c_nominal = 0.3
     mppi.Policy.alpha_s = 0.3
     mppi.Policy.policy_upd_rate = 0.5
-    mppi.dst_thr = 0.4
+    mppi.dst_thr = 0.5
     # jit warmup
     for i in range(20):
         _, _, _ = mppi.propagate()
