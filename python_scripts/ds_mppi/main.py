@@ -53,8 +53,8 @@ def main_int():
     nn_model.model_jit = torch.jit.script(nn_model.model_jit)
     nn_model.model_jit = torch.jit.optimize_for_inference(nn_model.model_jit)
 
-    nn_model.model_jit_q = torch.jit.script(nn_model.model_jit_q)
-    nn_model.model_jit_q = torch.jit.optimize_for_inference(nn_model.model_jit_q)
+    nn_model.model_jit_q = torch.jit.script(nn_model.model_jit)
+    nn_model.model_jit_q = torch.jit.optimize_for_inference(nn_model.model_jit)
 
     nn_model.update_aot_lambda()
     #nn_model.model.eval()
@@ -80,10 +80,10 @@ def main_int():
     o_h_arr = plot_obs_init(obs)
     # Integration parameters
     A = -1 * torch.diag(torch.ones(DOF)).to(**params)
-    N_traj = 50
-    dt_H = 5
-    dt = 0.4
-    dt_sim = 0.05
+    N_traj = 10
+    dt_H = 30
+    dt = 0.2
+    dt_sim = 0.1
     q_cur = q_0
     N_ITER = 0
     # kernel adding thresholds

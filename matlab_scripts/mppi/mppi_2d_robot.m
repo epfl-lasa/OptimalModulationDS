@@ -8,7 +8,7 @@ rng('default')
 load('../planar_robot_2d/data/net50_pos_thr.mat')
 [y_f, dy_f] = tanhNN(net);
 obs_pos = [7 0]';
-obs_r = 2;
+obs_r = 1;
 
 %% robot
 r = [4 4 0];
@@ -42,17 +42,17 @@ crc_h = plot(ax_anim, xc, yc, 'r-','LineWidth',1.5);
 
 %% Constants and Parameters
 N_ITER = 1000;
-H = 30;
+H = 20;
 D = 2;
 SIGMA = [1, 0.5, 0.1];
 N_POL = size(SIGMA,2);
 MU_ARR = zeros(D, H, N_POL);
 
 dT = 0.1;
-N_TRAJ = 30;
+N_TRAJ = 50;
 gamma_vec = flip([0.98.^linspace(1,H-1,H-1), 0.98^H]);
 beta = 0.9;
-mu_alpha = 0.99;
+mu_alpha = 0.9;
 %% lambdas
 get_norm_samples = @(MU_ARR, SIGMA, N_TRAJ)...
                         normrnd(repmat(MU_ARR,[1,1,N_TRAJ]), SIGMA);

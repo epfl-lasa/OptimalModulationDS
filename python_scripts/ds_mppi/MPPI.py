@@ -109,8 +109,10 @@ class MPPI:
             with record_function("TAG: Apply policy"):
                 # policy control
                 policy_value[abs(policy_value) < 1e-6] = 0  # to normalize without errors
-                policy_value = torch.nan_to_num(policy_value / torch.norm(policy_value, 2, 1).unsqueeze(1))
+                #policy_value = torch.nan_to_num(policy_value / torch.norm(policy_value, 2, 1).unsqueeze(1))
+                policy_value = torch.nan_to_num(policy_value / torch.sum(policy_value, 1).unsqueeze(1))
                 policy_velocity = (E[:, :, 1:] @ policy_value.unsqueeze(2)).squeeze(2)
+                #olicy_velocity += ((1-l_n)/100).unsqueeze(1) * E[:, :, 0]
                 # calculate modulated vector field (and normalize)
                 nominal_velocity_norm = torch.norm(nominal_velocity, dim=1).reshape(-1, 1)
                 policy_velocity = policy_velocity * nominal_velocity_norm
