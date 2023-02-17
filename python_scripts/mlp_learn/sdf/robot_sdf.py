@@ -36,7 +36,7 @@ class RobotSdfCollisionNet():
             tensor_args (Dict): device and dtype for pytorch tensors
         """
         try:
-            chk = torch.load(f_name)
+            chk = torch.load(f_name, map_location=torch.device('cpu'))
             self.model.load_state_dict(chk["model_state_dict"])
             self.norm_dict = chk["norm"]
             for k in self.norm_dict.keys():

@@ -46,9 +46,9 @@ def main_int():
     # prepare models: standard (used for AOT implementation), jit, jit+quantization
     nn_model.model_jit = nn_model.model
 
-    nn_model.model_jit_q = torch.quantization.quantize_dynamic(
-        nn_model.model, qconfig_spec={torch.nn.Linear}, dtype=torch.qint8
-    )
+    # nn_model.model_jit_q = torch.quantization.quantize_dynamic(
+    #     nn_model.model, qconfig_spec={torch.nn.Linear}, dtype=torch.qint8
+    # )
 
     nn_model.model_jit = torch.jit.script(nn_model.model_jit)
     nn_model.model_jit = torch.jit.optimize_for_inference(nn_model.model_jit)
