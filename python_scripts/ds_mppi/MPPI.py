@@ -4,7 +4,7 @@ from fk_num import *
 from fk_sym_gen import *
 
 from torch.profiler import record_function
-
+import asyncio
 
 @torch.jit.script
 def get_mindist(all_links, obs):

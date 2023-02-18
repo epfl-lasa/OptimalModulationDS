@@ -4,8 +4,6 @@ from propagation import *
 import sys
 sys.dont_write_bytecode = False
 import copy
-import cProfile
-import pstats
 
 #
 from torch.profiler import record_function
@@ -107,6 +105,7 @@ def main_int():
     # jit warmup
     for i in range(20):
         _, _, _ = mppi.propagate()
+
     #     _ = mppi.nn_model.model_jit.forward(torch.randn(N_traj*obs.shape[0], 10).to(**params))
     #     _ = mppi.nn_model.model_jit_q.forward(torch.randn(N_traj*obs.shape[0], 10).to(**params))
     #     _, _, _ = mppi.nn_model.dist_grad_closest(torch.randn(N_traj, 10).to(**params))
@@ -151,7 +150,7 @@ def main_int():
             mppi_step.q_cur = copy.copy(mppi.q_cur)
             _, _, _ = mppi_step.propagate()
             mppi.q_cur = mppi.q_cur + mppi_step.qdot[0, :] * dt_sim
-            print(mppi.qdot[best_idx, :] - mppi_step.qdot[0, :])
+            #print(mppi.qdot[best_idx, :] - mppi_step.qdot[0, :])
             cur_fk, _ = numeric_fk_model(mppi.q_cur, dh_params, 10)
             upd_r_h(cur_fk.to('cpu'), r_h)
             r_h.set_zorder(10000)
