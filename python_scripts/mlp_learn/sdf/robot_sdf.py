@@ -153,10 +153,11 @@ class RobotSdfCollisionNet():
         minIdx = torch.argmin(dists, dim=1)
         grad_v = torch.zeros(points.shape[0], self.out_channels).to(points.device)
         grad_v[list(range(points.shape[0])), minIdx] = 1
-        return dists, vjp_fn(grad_v)[0], minIdx
+        return dists.detach(), vjp_fn(grad_v)[0].detach(), minIdx.detach()
 
     def dist_grad_closest_aot(self, q):
         return self.aot_lambda(q)
+        #return self.functorch_vjp(q)
 
     def update_aot_lambda(self):
         self.aot_lambda = aot_function(self.functorch_vjp, fw_compiler=ts_compile, bw_compiler=ts_compile)

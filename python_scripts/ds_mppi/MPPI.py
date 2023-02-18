@@ -81,6 +81,7 @@ class MPPI:
             with record_function("TAG: evaluate NN"):
                 # evaluate NN
                 distance, self.nn_grad = self.distance_repulsion_nn(q_prev)
+                self.nn_grad = self.nn_grad[0:self.N_traj, :] #fixes issue with aot_function cache
                 #distance, self.nn_grad = self.distance_repulsion_fk(q_prev) #not implemented for Franka
                 distance -= self.dst_thr
                 self.closest_dist_all[:, i - 1] = distance
@@ -118,7 +119,7 @@ class MPPI:
                 policy_velocity = policy_velocity * nominal_velocity_norm
                 mod_velocity = (M @ (nominal_velocity + policy_velocity).unsqueeze(2)).squeeze()
                 # normalization
-                mod_velocity_norm = torch.norm(mod_velocity, dim=1).reshape(-1, 1)
+                mod_velocity_norm = torch.norm(mod_velocity, dim=-1).reshape(-1, 1)
                 mod_velocity_norm[mod_velocity_norm <= 0.5] = 1
                 mod_velocity = torch.nan_to_num(mod_velocity / mod_velocity_norm)
                 # slow down for collision case
@@ -129,6 +130,7 @@ class MPPI:
                 if i == 1:
                     self.qdot = mod_velocity
         return self.all_traj, self.closest_dist_all, self.kernel_val_all[:, :, 0:P.n_kernels]
+
 
     def distance_repulsion_nn(self, q_prev):
         with record_function("TAG: evaluate NN_1 (build input)"):

@@ -2,6 +2,8 @@ import torch
 
 from propagation import *
 import sys
+sys.dont_write_bytecode = False
+import copy
 import cProfile
 import pstats
 
@@ -57,6 +59,7 @@ def main_int():
     nn_model.model_jit_q = torch.jit.optimize_for_inference(nn_model.model_jit)
 
     nn_model.update_aot_lambda()
+
     #nn_model.model.eval()
     # Initial state
     q_0 = torch.zeros(DOF).to(**params)
@@ -89,11 +92,18 @@ def main_int():
     # kernel adding thresholds
     thr_dist = 0.5
     thr_rbf = 1e-3
+
+    #primary MPPI to sample naviagtion policy
     mppi = MPPI(q_0, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a, nn_model)
     mppi.Policy.sigma_c_nominal = 0.3
     mppi.Policy.alpha_s = 0.3
     mppi.Policy.policy_upd_rate = 0.5
     mppi.dst_thr = 0.5
+
+    #set up second mppi to move the robot
+    mppi_step = MPPI(q_0, q_f, dh_params, obs, dt_sim, 2, 1, A, dh_a, nn_model)
+    mppi_step.Policy.alpha_s *= 0
+
     # jit warmup
     for i in range(20):
         _, _, _ = mppi.propagate()
@@ -133,8 +143,15 @@ def main_int():
                 upd_r_h(kernel_fk.to('cpu'), c_h[(mppi.Policy.n_kernels - 1) % len(c_h)])
 
             # Update current robot state
-            #mppi.q_cur = all_traj[best_idx, 1, :]
-            mppi.q_cur = mppi.q_cur + mppi.qdot[best_idx, :] * dt_sim
+            mppi_step.Policy.mu_c = mppi.Policy.mu_c
+            mppi_step.Policy.sigma_c = mppi.Policy.sigma_c
+            mppi_step.Policy.alpha_c = mppi.Policy.alpha_tmp[best_idx]
+            mppi_step.Policy.n_kernels = mppi.Policy.n_kernels
+            mppi_step.Policy.sample_policy()
+            mppi_step.q_cur = copy.copy(mppi.q_cur)
+            _, _, _ = mppi_step.propagate()
+            mppi.q_cur = mppi.q_cur + mppi_step.qdot[0, :] * dt_sim
+            print(mppi.qdot[best_idx, :] - mppi_step.qdot[0, :])
             cur_fk, _ = numeric_fk_model(mppi.q_cur, dh_params, 10)
             upd_r_h(cur_fk.to('cpu'), r_h)
             r_h.set_zorder(10000)
