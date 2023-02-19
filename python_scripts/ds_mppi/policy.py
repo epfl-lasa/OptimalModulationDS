@@ -101,12 +101,15 @@ class TensorPolicyMPPI:
         # If yes, output this position as potential kernel center
         # all_traj: all trajectories
         # closests_dist_all: distance to closest obstacle for each point of each trajectory
-        # kernel_val_all: value of RBF kernels for each point of each trajectory
         # return: potential kernel centers
         idx_close = closests_dist_all < thr_dist
-        dist_ker_centers = all_traj - self.mu_c[0:self.n_kernels].unsqueeze(0)
-        idx_no_kernel = dist_ker_centers > thr_kernel
-
+        if self.n_kernels>0:
+            diff_ker_centers = all_traj.view(-1, self.n_dof) - self.mu_c[0:self.n_kernels].unsqueeze(1)
+            dist_ker_centers = diff_ker_centers.norm(-1, 2).view(-1, self.n_traj, all_traj.shape[1])
+            mindist_ker_centers = torch.min(dist_ker_centers, 0)[0]
+            idx_no_kernel = mindist_ker_centers > thr_kernel
+        else:
+            idx_no_kernel = torch.ones_like(idx_close)
         idx_candidates = idx_close * idx_no_kernel
         # candidates = torch.unique(all_traj[idx_candidates], dim=0)
         candidates = all_traj[idx_candidates]

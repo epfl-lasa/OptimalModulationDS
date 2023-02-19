@@ -81,7 +81,7 @@ def main_int():
     o_h_arr = plot_obs_init(obs)
     # Integration parameters
     A = -1 * torch.diag(torch.ones(DOF)).to(**params)
-    N_traj = 3
+    N_traj = 50
     dt_H = 10
     dt = 0.2
     dt_sim = 0.1
@@ -110,7 +110,7 @@ def main_int():
     #     _ = mppi.nn_model.model_jit_q.forward(torch.randn(N_traj*obs.shape[0], 10).to(**params))
     #     _, _, _ = mppi.nn_model.dist_grad_closest(torch.randn(N_traj, 10).to(**params))
     #     _, _, _ = mppi.nn_model.dist_grad_closest_aot(torch.randn(N_traj, 10).to(**params))
-
+    best_idx = -1
     t0 = time.time()
     print('Init time: %4.2fs' % (t0 - t00))
     PROFILING = False
@@ -134,8 +134,8 @@ def main_int():
                 best_idx = torch.argmin(cost)
                 mppi.shift_policy_means()
             # Check trajectory for new kernel candidates and add policy kernels
-            kernel_candidates = check_traj_for_kernels(all_traj, closests_dist_all, kernel_val_all, thr_dist, thr_rbf)
-            # kernel_candidates = mppi.Policy.check_traj_for_kernels(all_traj, closests_dist_all, thr_dist, 1)
+            #kernel_candidates = check_traj_for_kernels(all_traj, closests_dist_all, kernel_val_all, thr_dist, thr_rbf)
+            kernel_candidates = mppi.Policy.check_traj_for_kernels(all_traj, closests_dist_all, thr_dist, 0.05)
 
             if len(kernel_candidates) > 0:
                 rand_idx = torch.randint(kernel_candidates.shape[0], (1,))
@@ -146,7 +146,11 @@ def main_int():
             # Update current robot state
             mppi_step.Policy.mu_c = mppi.Policy.mu_c
             mppi_step.Policy.sigma_c = mppi.Policy.sigma_c
-            mppi_step.Policy.alpha_c = mppi.Policy.alpha_tmp[best_idx]
+            if best_idx:
+                mppi_step.Policy.alpha_c = mppi.Policy.alpha_tmp[best_idx]
+            else:
+                mppi_step.Policy.alpha_c = mppi.Policy.alpha_c
+
             mppi_step.Policy.n_kernels = mppi.Policy.n_kernels
             mppi_step.Policy.sample_policy()
             mppi_step.q_cur = copy.copy(mppi.q_cur)
@@ -155,7 +159,7 @@ def main_int():
             #print(mppi.qdot[best_idx, :] - mppi_step.qdot[0, :])
             cur_fk, _ = numeric_fk_model(mppi.q_cur, dh_params, 10)
             upd_r_h(cur_fk.to('cpu'), r_h)
-            r_h.set_zorder(10000)
+            r_h.set_zorder(1000)
             # obs[0, 0] += 0.03
             # plot_obs_update(o_h_arr, obs)
             plt.pause(0.0001)
@@ -164,6 +168,8 @@ def main_int():
                 torch_profiler.step()
             if N_ITER > 10000:
                 break
+            if N_ITER == 4:
+                t0 = time.time()
             # print(q_cur)
             t_iter = time.time() - t_iter
             print(f'Iteration:{N_ITER:4d}, Time:{t_iter:4.2f}, Frequency:{1/t_iter:4.2f},',
