@@ -80,24 +80,25 @@ def main_int():
     c_h = init_kernel_means(100)
     o_h_arr = plot_obs_init(obs)
     # Integration parameters
-    A = -1 * torch.diag(torch.ones(DOF)).to(**params)
-    N_traj = 50
-    dt_H = 10
-    dt = 0.2
-    dt_sim = 0.1
+    A = -1 * torch.diag(torch.ones(DOF)).to(**params) #nominal DS
+    N_traj = 100                 # number of trajectories in exploration sampling
+    dt_H = 10                   # horizon length in exploration sampling
+    dt = 0.2                    # integration timestep in exploration sampling
+    dt_sim = 0.1                # integration timestep for actual robot motion
     q_cur = q_0
     N_ITER = 0
     # kernel adding thresholds
-    thr_dist = 0.5
-    thr_rbf = 1e-3
+    dst_thr = 0.5               # distance to collision (everything below - adds a kernel)
+    thr_rbf_add = 0.05          # distance to closest kernel (l2 norm of 7d vector difference)
 
     #primary MPPI to sample naviagtion policy
     mppi = MPPI(q_0, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a, nn_model)
-    mppi.Policy.sigma_c_nominal = 0.3
+    mppi.Policy.sigma_c_nominal = 1
     mppi.Policy.alpha_s = 0.3
     mppi.Policy.policy_upd_rate = 0.5
-    mppi.dst_thr = thr_dist
-    mppi.ker_thr = thr_rbf
+    mppi.dst_thr = dst_thr      # substracted from actual distance (added threshsold)
+    mppi.ker_thr = 1e-3         # used to create update mask for policy means
+
     #set up second mppi to move the robot
     mppi_step = MPPI(q_0, q_f, dh_params, obs, dt_sim, 2, 1, A, dh_a, nn_model)
     mppi_step.Policy.alpha_s *= 0
@@ -134,8 +135,7 @@ def main_int():
                 best_idx = torch.argmin(cost)
                 mppi.shift_policy_means()
             # Check trajectory for new kernel candidates and add policy kernels
-            #kernel_candidates = check_traj_for_kernels(all_traj, closests_dist_all, kernel_val_all, thr_dist, thr_rbf)
-            kernel_candidates = mppi.Policy.check_traj_for_kernels(all_traj, closests_dist_all, thr_dist, 0.05)
+            kernel_candidates = mppi.Policy.check_traj_for_kernels(all_traj, closests_dist_all, dst_thr, thr_rbf_add)
 
             if len(kernel_candidates) > 0:
                 rand_idx = torch.randint(kernel_candidates.shape[0], (1,))
@@ -146,7 +146,7 @@ def main_int():
             # Update current robot state
             mppi_step.Policy.mu_c = mppi.Policy.mu_c
             mppi_step.Policy.sigma_c = mppi.Policy.sigma_c
-            if best_idx:
+            if 0*best_idx:
                 mppi_step.Policy.alpha_c = mppi.Policy.alpha_tmp[best_idx]
             else:
                 mppi_step.Policy.alpha_c = mppi.Policy.alpha_c

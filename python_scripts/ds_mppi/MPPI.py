@@ -97,12 +97,19 @@ class MPPI:
                 E[:, :, 0] = self.nn_grad / self.nn_grad.norm(2, 1).unsqueeze(1)
             with record_function("TAG: Modulation-propagation"):
                 # calculate standard modulation coefficients
-                gamma = distance + 1
-                gamma[gamma < 0] = 1e-8
-                l_n = 1 - 1 / gamma
-                l_tau = 1 + 1 / gamma
-                l_n[l_n < 0] = 0
-                l_tau[l_tau < 1] = 1
+                # gamma = distance + 1
+                # gamma[gamma < 0] = 1e-8
+                # l_n = 1 - 1 / gamma
+                # l_tau = 1 + 1 / gamma
+                # l_n[l_n < 0] = 0
+                # l_tau[l_tau < 1] = 1
+                # calculate own modulation coefficients
+                dist_low, dist_high = 0.5, 3
+                ln_min, ln_max = 0, 1
+                ltau_min, ltau_max = 1, 2
+                k_sigmoid = 3
+                l_n = generalized_sigmoid(distance, ln_min, ln_max, dist_low, dist_high, k_sigmoid)
+                l_tau = generalized_sigmoid(distance, ltau_max, ltau_min, dist_low, dist_high, k_sigmoid)
                 # self.D = self.D * 0 + torch.eye(self.n_dof).to(**self.tensor_args)
                 # self.D = l_tau[:, None, None] * self.D
                 self.D = l_tau.repeat_interleave(self.n_dof).reshape((self.N_traj, self.n_dof)).diag_embed(0, 1, 2)
@@ -111,21 +118,26 @@ class MPPI:
                 M = E @ self.D @ E.transpose(1, 2)
             with record_function("TAG: Apply policy"):
                 # policy control
-                policy_value[abs(policy_value) < 1e-6] = 0  # to normalize without errors
-                #policy_value = torch.nan_to_num(policy_value / torch.norm(policy_value, 2, 1).unsqueeze(1))
-                policy_value = torch.nan_to_num(policy_value / torch.sum(policy_value, 1).unsqueeze(1))
+                # policy_value[abs(policy_value) < 1e-4] = 0  # to normalize without errors
+                # policy_value = torch.nan_to_num(policy_value / torch.norm(policy_value, 2, 1).unsqueeze(1))
+                # policy_value = torch.nan_to_num(policy_value / torch.sum(policy_value, 1).unsqueeze(1))
                 policy_velocity = (E[:, :, 1:] @ policy_value.unsqueeze(2)).squeeze(2)
-                #olicy_velocity += ((1-l_n)/100).unsqueeze(1) * E[:, :, 0]
+                #policy_velocity += ((1-l_n)/100).unsqueeze(1) * E[:, :, 0]
                 # calculate modulated vector field (and normalize)
                 nominal_velocity_norm = torch.norm(nominal_velocity, dim=1).reshape(-1, 1)
-                policy_velocity = policy_velocity * nominal_velocity_norm
-                mod_velocity = (M @ (nominal_velocity + policy_velocity).unsqueeze(2)).squeeze()
+                policy_velocity = policy_velocity * nominal_velocity_norm             # magnitude of nominal velocity
+                total_velocity = nominal_velocity + policy_velocity                   # magnitude of 2x nominal velocity
+                total_velocity_norm = torch.norm(total_velocity, dim=1).unsqueeze(1)
+                total_velocity_scaled = nominal_velocity_norm * total_velocity / total_velocity_norm
+                mod_velocity = (M @ (total_velocity_scaled).unsqueeze(2)).squeeze()
                 # normalization
                 mod_velocity_norm = torch.norm(mod_velocity, dim=-1).reshape(-1, 1)
                 mod_velocity_norm[mod_velocity_norm <= 0.5] = 1
                 mod_velocity = torch.nan_to_num(mod_velocity / mod_velocity_norm)
-                # slow down for collision case
+                # slow down and repulsion for collision case
                 mod_velocity[distance < 0] *= 0.1
+                repulsion_velocity = E[:, :, 0] * nominal_velocity_norm*0.1
+                mod_velocity[distance < 0] += repulsion_velocity[distance < 0]
             with record_function("TAG: Propagate"):
                 # propagate
                 self.all_traj[:, i, :] = self.all_traj[:, i - 1, :] + self.dt * mod_velocity
@@ -204,3 +216,7 @@ class MPPI:
         noupd_mask = self.kernel_val_all[:, :, 0:self.Policy.n_kernels].sum(1).mean(0) < self.ker_thr
         self.Policy.update_policy(w, self.policy_upd_rate, noupd_mask)
         return 0
+
+def generalized_sigmoid(x, y_min, y_max, x0, x1, k):
+    return y_min + (y_max - y_min) / (1 + torch.exp(k * (-x + (x0+x1)/2)))
+
