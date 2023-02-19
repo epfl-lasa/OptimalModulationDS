@@ -94,10 +94,10 @@ def main_loop(gym_instance):
 
     # Integration parameters
     A = -1 * torch.diag(torch.ones(DOF)).to(**params)
-    N_traj = 100
-    dt_H = 3
-    dt = 0.5
-    dt_sim = 0.1
+    N_traj = 50
+    dt_H = 5
+    dt = 0.2
+    dt_sim = 0.2
     N_ITER = 0
     # # kernel adding thresholds
     # thr_dist = 0.00
@@ -111,8 +111,8 @@ def main_loop(gym_instance):
     # mppi.ker_thr = 1e-2
 
     # kernel adding thresholds
-    dst_thr = 0.03              # distance to collision (everything below - adds a kernel)
-    thr_rbf_add = 0.1          # distance to closest kernel (l2 norm of 7d vector difference)
+    dst_thr = 0.05              # distance to collision (everything below - adds a kernel)
+    thr_rbf_add = 0.03          # distance to closest kernel (l2 norm of 7d vector difference)
 
     #primary MPPI to sample naviagtion policy
     mppi = MPPI(q_0, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a, nn_model)
