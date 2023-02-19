@@ -96,6 +96,22 @@ class TensorPolicyMPPI:
         else:
             print('Not adding new kernel at: maximum number of kernels reached', q)
 
+    def check_traj_for_kernels(self, all_traj, closests_dist_all, thr_dist, thr_kernel):
+        # Check if a trajectory has encountered an obstacle
+        # If yes, output this position as potential kernel center
+        # all_traj: all trajectories
+        # closests_dist_all: distance to closest obstacle for each point of each trajectory
+        # kernel_val_all: value of RBF kernels for each point of each trajectory
+        # return: potential kernel centers
+        idx_close = closests_dist_all < thr_dist
+        dist_ker_centers = all_traj - self.mu_c[0:self.n_kernels].unsqueeze(0)
+        idx_no_kernel = dist_ker_centers > thr_kernel
+
+        idx_candidates = idx_close * idx_no_kernel
+        # candidates = torch.unique(all_traj[idx_candidates], dim=0)
+        candidates = all_traj[idx_candidates]
+        return candidates
+
 
 # @torch.jit.script
 def eval_policy(rbf_val: torch.Tensor,
@@ -127,11 +143,19 @@ def check_traj_for_kernels(all_traj, closests_dist_all, kernel_val_all, thr_dist
     # closests_dist_all: distance to closest obstacle for each point of each trajectory
     # kernel_val_all: value of RBF kernels for each point of each trajectory
     # return: potential kernel centers
+    kernel_val_all[:, -1] += 10
     idx_close = closests_dist_all < thr_dist
     kernel_val_all_sum = torch.sum(kernel_val_all, 2)
     idx_no_kernel = kernel_val_all_sum < thr_kernel
+    if kernel_val_all.shape[-1]>0:
+        max_ker_val, _ = torch.max(kernel_val_all, -1)
+    else:
+        max_ker_val = idx_close*0
+    idx_no_kernel = max_ker_val < thr_kernel
+
     idx_candidates = idx_close * idx_no_kernel
-    candidates = torch.unique(all_traj[idx_candidates], dim=0)
+    # candidates = torch.unique(all_traj[idx_candidates], dim=0)
+    candidates = all_traj[idx_candidates]
     return candidates
 
 

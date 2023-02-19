@@ -18,7 +18,6 @@ def init_robot_plot(links, xmin, xmax, ymin, ymax):
 
 def init_jpos_plot(xmin, xmax, ymin, ymax):
     # Initialize the joint position plot
-    plt.ion()
     fig = plt.figure(2)
     ax = fig.add_subplot(111)
     ax.set_xlim(xmin, xmax)
@@ -27,6 +26,7 @@ def init_jpos_plot(xmin, xmax, ymin, ymax):
     ax.set_ylabel('Y')
     ax.set_aspect('equal')
     rob, = plt.plot([], [], 'o', color=[0, 0.4470, 0.7410], markersize=5)
+    plt.ion()
     plt.show()
     return rob
 

@@ -49,6 +49,7 @@ class MPPI:
         self.dst_thr = 0.5
         self.qdot = torch.zeros((self.N_traj, self.n_dof)).to(**self.tensor_args)
         self.ker_thr = 1e-3
+
     def reset_tensors(self):
         self.all_traj = self.all_traj * 0
         self.closest_dist_all = 100 + self.closest_dist_all * 0
@@ -70,10 +71,11 @@ class MPPI:
             # apply policies
             with record_function("TAG: Apply policies"):
                 kernel_value = eval_rbf(q_prev, P.mu_tmp[:, 0:P.n_kernels], P.sigma_tmp[:, 0:P.n_kernels])
-                kernel_value[kernel_value < self.ker_thr] = 0
-                ker_w = torch.exp(50*kernel_value)
-                ker_w[kernel_value < self.ker_thr] = 0
-                self.ker_w = torch.nan_to_num(ker_w / torch.sum(ker_w, 1).unsqueeze(1)) #normalize kernel influence
+                # kernel_value[kernel_value < self.ker_thr] = 0
+                # ker_w = torch.exp(50*kernel_value)
+                # ker_w[kernel_value < self.ker_thr] = 0
+                # self.ker_w = torch.nan_to_num(ker_w / torch.sum(ker_w, 1).unsqueeze(1)) #normalize kernel influence
+                self.ker_w = kernel_value
                 policy_value = torch.sum(P.alpha_tmp[:, 0:P.n_kernels] * self.ker_w, 1)
                 if P.n_kernels > 0:
                     self.kernel_val_all[:, i - 1, 0:P.n_kernels] = kernel_value.reshape((self.N_traj, P.n_kernels))

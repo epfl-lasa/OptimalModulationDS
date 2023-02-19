@@ -157,7 +157,7 @@ class RobotSdfCollisionNet():
 
     def dist_grad_closest_aot(self, q):
         return self.aot_lambda(q)
-        #return self.functorch_vjp(q)
+        # return self.functorch_vjp(q)
 
     def update_aot_lambda(self):
         self.aot_lambda = aot_function(self.functorch_vjp, fw_compiler=ts_compile, bw_compiler=ts_compile)

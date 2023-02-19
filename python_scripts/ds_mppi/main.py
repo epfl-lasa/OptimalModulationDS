@@ -26,8 +26,8 @@ def trace_handler(profiler):
     profiler.export_chrome_trace("trace_CPU.json")
 
 
-torch.manual_seed(0)
-torch.cuda.manual_seed(0)
+# torch.manual_seed(0)
+# torch.cuda.manual_seed(0)
 def main_int():
     t00 = time.time()
     DOF = 7
@@ -81,8 +81,8 @@ def main_int():
     o_h_arr = plot_obs_init(obs)
     # Integration parameters
     A = -1 * torch.diag(torch.ones(DOF)).to(**params)
-    N_traj = 10
-    dt_H = 30
+    N_traj = 3
+    dt_H = 10
     dt = 0.2
     dt_sim = 0.1
     q_cur = q_0
@@ -96,8 +96,8 @@ def main_int():
     mppi.Policy.sigma_c_nominal = 0.3
     mppi.Policy.alpha_s = 0.3
     mppi.Policy.policy_upd_rate = 0.5
-    mppi.dst_thr = 0.5
-
+    mppi.dst_thr = thr_dist
+    mppi.ker_thr = thr_rbf
     #set up second mppi to move the robot
     mppi_step = MPPI(q_0, q_f, dh_params, obs, dt_sim, 2, 1, A, dh_a, nn_model)
     mppi_step.Policy.alpha_s *= 0
@@ -135,6 +135,8 @@ def main_int():
                 mppi.shift_policy_means()
             # Check trajectory for new kernel candidates and add policy kernels
             kernel_candidates = check_traj_for_kernels(all_traj, closests_dist_all, kernel_val_all, thr_dist, thr_rbf)
+            # kernel_candidates = mppi.Policy.check_traj_for_kernels(all_traj, closests_dist_all, thr_dist, 1)
+
             if len(kernel_candidates) > 0:
                 rand_idx = torch.randint(kernel_candidates.shape[0], (1,))
                 mppi.Policy.add_kernel(kernel_candidates[rand_idx[0]])
