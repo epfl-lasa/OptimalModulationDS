@@ -85,7 +85,7 @@ def main_int():
     dt_H = 10                   # horizon length in exploration sampling
     dt = 0.2                    # integration timestep in exploration sampling
     dt_sim = 0.1                # integration timestep for actual robot motion
-    q_cur = q_0
+
     N_ITER = 0
     # kernel adding thresholds
     dst_thr = 0.5               # distance to collision (everything below - adds a kernel)
@@ -96,7 +96,7 @@ def main_int():
     mppi.Policy.sigma_c_nominal = 1
     mppi.Policy.alpha_s = 0.3
     mppi.Policy.policy_upd_rate = 0.5
-    mppi.dst_thr = dst_thr      # substracted from actual distance (added threshsold)
+    mppi.dst_thr = dst_thr/2      # substracted from actual distance (added threshsold)
     mppi.ker_thr = 1e-3         # used to create update mask for policy means
 
     #set up second mppi to move the robot

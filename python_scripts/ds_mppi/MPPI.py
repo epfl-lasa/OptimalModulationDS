@@ -104,7 +104,9 @@ class MPPI:
                 # l_n[l_n < 0] = 0
                 # l_tau[l_tau < 1] = 1
                 # calculate own modulation coefficients
-                dist_low, dist_high = 0.5, 3
+                # dist_low, dist_high = 0.5, 3       #for planar robot (units)
+                dist_low, dist_high = 0.03, 0.1     #for franka robot (meters)
+
                 ln_min, ln_max = 0, 1
                 ltau_min, ltau_max = 1, 2
                 k_sigmoid = 3
@@ -136,7 +138,7 @@ class MPPI:
                 mod_velocity = torch.nan_to_num(mod_velocity / mod_velocity_norm)
                 # slow down and repulsion for collision case
                 mod_velocity[distance < 0] *= 0.1
-                repulsion_velocity = E[:, :, 0] * nominal_velocity_norm*0.1
+                repulsion_velocity = E[:, :, 0] * nominal_velocity_norm*0.01
                 mod_velocity[distance < 0] += repulsion_velocity[distance < 0]
             with record_function("TAG: Propagate"):
                 # propagate
