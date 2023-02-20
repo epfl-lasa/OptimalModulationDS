@@ -1,15 +1,10 @@
 import torch
 
-from propagation import *
 import sys
 sys.dont_write_bytecode = False
 import copy
 
-#
-from torch.profiler import record_function
-
-from policy import *
-from propagation import *
+sys.path.append('../functions/')
 from MPPI import *
 sys.path.append('../mlp_learn/')
 from sdf.robot_sdf import RobotSdfCollisionNet

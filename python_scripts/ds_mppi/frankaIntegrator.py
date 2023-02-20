@@ -1,3 +1,5 @@
+import sys
+sys.path.append('/functions/')
 from isaac_gym_helpers import *
 from MPPI import *
 import torch
@@ -71,18 +73,6 @@ def main_loop(gym_instance):
     dt_sim = 0.2
     N_ITER = 0
 
-    # kernel adding thresholds
-    dst_thr = 0.05              # distance to collision (everything below - adds a kernel)
-    thr_rbf_add = 0.03          # distance to closest kernel (l2 norm of 7d vector difference)
-
-    #primary MPPI to sample naviagtion policy
-    mppi = MPPI(q_0, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a, nn_model)
-    mppi.Policy.sigma_c_nominal = 1
-    mppi.Policy.alpha_s = 0.3
-    mppi.Policy.policy_upd_rate = 0.5
-    mppi.dst_thr = dst_thr/2    # substracted from actual distance (added threshsold)
-    mppi.ker_thr = 1e-3         # used to create update mask for policy means
-
     #set up second mppi to move the robot
     mppi_step = MPPI(q_0, q_f, dh_params, obs, dt_sim, 2, 1, A, dh_a, nn_model)
     mppi_step.Policy.alpha_s *= 0
@@ -104,61 +94,38 @@ def main_loop(gym_instance):
     ########################################
     # warmup gym and jit
     for i in range(20):
-        mppi.Policy.sample_policy()
-        _, _, _ = mppi.propagate()
+        mppi_step.Policy.sample_policy()
+        _, _, _ = mppi_step.propagate()
         gym_instance.step()
-        robot_sim.set_robot_state(mppi.q_cur, mppi.q_cur*0, env_ptr, robot_ptr)
-        numeric_fk_model(mppi.q_cur, dh_params, 10)
+        robot_sim.set_robot_state(mppi_step.q_cur, mppi_step.q_cur*0, env_ptr, robot_ptr)
+        numeric_fk_model(mppi_step.q_cur, dh_params, 10)
     best_idx = -1
     print('Init time: %4.2fs' % (time.time() - t00))
     time.sleep(1)
     t0 = time.time()
     all_fk_kernel = []
-    while torch.norm(mppi.q_cur - q_f)+1 > 0.001:
+    while torch.norm(mppi_step.q_cur - q_f)+1 > 0.001:
         t_iter = time.time()
-        # Sample random policies
-        mppi.Policy.sample_policy()
+        # Receive policy from planner
+        # mppi_step.Policy.n_kernels = mppi.Policy.n_kernels
+        # mppi_step.Policy.mu_c = mppi.Policy.mu_c
+        # mppi_step.Policy.sigma_c = mppi.Policy.sigma_c
+        # if 0*best_idx:
+        #     mppi_step.Policy.alpha_c = mppi.Policy.alpha_tmp[best_idx]
+        # else:
+        #     mppi_step.Policy.alpha_c = mppi.Policy.alpha_c
+
         # Propagate modulated DS
 
-        with record_function("TAG: general propagation"):
-            all_traj, closests_dist_all, kernel_val_all = mppi.propagate()
-
-        with record_function("TAG: cost calculation"):
-            # Calculate cost
-            cost = mppi.get_cost()
-            best_idx = torch.argmin(cost)
-            mppi.shift_policy_means()
-        # Check trajectory for new kernel candidates and add policy kernels
-        kernel_candidates = mppi.Policy.check_traj_for_kernels(all_traj, closests_dist_all, dst_thr, thr_rbf_add)
-
-        if len(kernel_candidates) > 0:
-            rand_idx = torch.randint(kernel_candidates.shape[0], (1,))
-            mppi.Policy.add_kernel(kernel_candidates[rand_idx[0]])
-            kernel_fk, _ = numeric_fk_model(kernel_candidates[rand_idx[0]], dh_params, 3)
-            fk_arr = kernel_fk.flatten(0, 1) @ R_tens[0:3, 0:3] + R_tens[0:3,3]
-            all_fk_kernel.append(fk_arr)
 
         gym_instance.clear_lines()
+        # Update current robot state
 
         # Update current robot state
-        # qdot = mppi.get_qdot('best')
-        # mppi.q_cur = mppi.q_cur + dt_sim * qdot
-
-        # Update current robot state
-        mppi_step.Policy.mu_c = mppi.Policy.mu_c
-        mppi_step.Policy.sigma_c = mppi.Policy.sigma_c
-        if 0*best_idx:
-            mppi_step.Policy.alpha_c = mppi.Policy.alpha_tmp[best_idx]
-        else:
-            mppi_step.Policy.alpha_c = mppi.Policy.alpha_c
-
-        mppi_step.Policy.n_kernels = mppi.Policy.n_kernels
-        mppi_step.Policy.sample_policy()
-        mppi_step.q_cur = copy.copy(mppi.q_cur)
+        mppi_step.Policy.sample_policy() # samples a new policy using planned means and sigmas
         _, _, _ = mppi_step.propagate()
-        mppi.q_cur = mppi.q_cur + mppi_step.qdot[0, :] * dt_sim
+        mppi_step.q_cur = mppi_step.q_cur + mppi_step.qdot[0, :] * dt_sim
 
-        # cur_fk, _ = numeric_fk_model(mppi.q_cur, dh_params, 3)
         goal_fk, _ = numeric_fk_model(q_f, dh_params, 2)
         # # draw lines in gym
         # draw kernels
@@ -174,9 +141,10 @@ def main_loop(gym_instance):
         #     gym_instance.draw_lines(fk, color=[1, 1, 1])
 
         gym_instance.step()
-        q_des = mppi.q_cur
+        q_des = mppi_step.q_cur
         dq_des = mppi_step.qdot[0, :] * 0
         robot_sim.set_robot_state(q_des, dq_des, env_ptr, robot_ptr)
+        # Send current state to planner
 
         N_ITER += 1
         if N_ITER > 10000:
@@ -185,8 +153,8 @@ def main_loop(gym_instance):
         t_iter = time.time() - t_iter
         print(f'Iteration:{N_ITER:4d}, Time:{t_iter:4.2f}, Frequency:{1/t_iter:4.2f},',
               f' Avg. frequency:{N_ITER/(time.time()-t0):4.2f}',
-              f' Kernel count:{mppi.Policy.n_kernels:4d}')
-        print('Position difference: %4.3f'% (mppi.q_cur - q_f).norm().cpu())
+              f' Kernel count:{mppi_step.Policy.n_kernels:4d}')
+        print('Position difference: %4.3f'% (mppi_step.q_cur - q_f).norm().cpu())
     td = time.time() - t0
     print('Time: ', td)
     print('Time per iteration: ', td / N_ITER, 'Hz: ', 1 / (td / (N_ITER)))

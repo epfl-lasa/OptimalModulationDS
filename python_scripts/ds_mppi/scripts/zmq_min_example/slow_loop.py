@@ -4,10 +4,11 @@ import zmq
 
 
 ## ZMQ setup
-# socket to publish data to fast loop
 context = zmq.Context()
+# socket to publish data to fast loop
 socket_send = context.socket(zmq.PUB)
 socket_send.bind("tcp://*:1337")
+
 # socket to receive data from fast loop
 socket_receive = context.socket(zmq.SUB)
 socket_receive.setsockopt(zmq.CONFLATE, 1)

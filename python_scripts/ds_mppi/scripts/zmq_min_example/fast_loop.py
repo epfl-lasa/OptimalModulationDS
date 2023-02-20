@@ -35,6 +35,7 @@ while True:
     time.sleep(1/500)  # work is 500 Hz
     data[1, 0] = iter
     #now send updated state to slow loop
+
     socket_send.send_pyobj(data)
 
     ## Iteration End

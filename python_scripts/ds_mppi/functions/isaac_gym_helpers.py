@@ -13,9 +13,9 @@ import torch
 
 ## create robot simulation
 def deploy_world_robot(gym_instance, params):
-    robot_yml = 'content/configs/gym/franka.yml'
+    robot_yml = os.path.dirname(__file__) + '/../content/configs/gym/franka.yml'
     sim_params = load_yaml(robot_yml)['sim_params']
-    sim_params['asset_root'] = os.path.dirname(__file__) + '/content/assets'
+    sim_params['asset_root'] = os.path.dirname(__file__) + '/../content/assets'
     sim_params['collision_model'] = None
     # task_file = 'franka_reacher_env2.yml'
     gym = gym_instance.gym
@@ -27,7 +27,7 @@ def deploy_world_robot(gym_instance, params):
     robot_ptr = robot_sim.spawn_robot(env_ptr, robot_pose, coll_id=2)
 
     # create world
-    world_yml = 'content/configs/gym/collision_demo.yml'
+    world_yml = os.path.dirname(__file__) + '/../content/configs/gym/collision_demo.yml'
     world_params = load_yaml(world_yml)
     # get pose
     w_T_r = copy.deepcopy(robot_sim.spawn_robot_pose)

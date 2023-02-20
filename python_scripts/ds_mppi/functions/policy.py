@@ -1,6 +1,5 @@
 import torch
-from fk_num import *
-from fk_sym_gen import *
+# from .fk_sym_gen import *
 import time
 from torch.profiler import profile, record_function, ProfilerActivity
 
