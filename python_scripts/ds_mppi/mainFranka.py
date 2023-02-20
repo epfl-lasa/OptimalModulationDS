@@ -85,8 +85,8 @@ def main_loop(gym_instance):
     middle_bar = t3 + torch.linspace(0, 1, 10).reshape(-1, 1) * (t4 - t3)
     bottom_bar = top_bar - torch.tensor([0, 0, 0.65, 0])
     obs = torch.vstack((top_bar, middle_bar, bottom_bar))
-    # obs = torch.vstack((middle_bar, bottom_bar))
-    obs = middle_bar
+    #obs = torch.vstack((middle_bar, bottom_bar))
+    #obs = middle_bar
 
     n_dummy = 1
     dummy_obs = torch.hstack((torch.zeros(n_dummy, 3)+10, torch.zeros(n_dummy, 1)+0.1)).to(**params)
@@ -94,8 +94,8 @@ def main_loop(gym_instance):
 
     # Integration parameters
     A = -1 * torch.diag(torch.ones(DOF)).to(**params)
-    N_traj = 50
-    dt_H = 5
+    N_traj = 100
+    dt_H = 10
     dt = 0.2
     dt_sim = 0.2
     N_ITER = 0
