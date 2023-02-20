@@ -1,4 +1,5 @@
 import sys
+import zmq
 sys.path.append('../functions/')
 from MPPI import *
 import torch
@@ -15,6 +16,20 @@ else:
 
 
 def main_loop():
+    ########################################
+    ###            ZMQ SETUP             ###
+    ########################################
+    context = zmq.Context()
+    # socket to publish data to fast loop
+    socket_send_policy = context.socket(zmq.PUB)
+    socket_send_policy.bind("tcp://*:1337")
+
+    # socket to receive data from fast loop
+    socket_receive_state = context.socket(zmq.SUB)
+    socket_receive_state.setsockopt(zmq.CONFLATE, 1)
+    socket_receive_state.connect("tcp://localhost:1338")
+    socket_receive_state.setsockopt(zmq.SUBSCRIBE, b"")
+
     ########################################
     ###        CONTROLLER SETUP          ###
     ########################################
@@ -68,15 +83,15 @@ def main_loop():
 
     # Integration parameters
     A = -1 * torch.diag(torch.ones(DOF)).to(**params)
-    N_traj = 100
-    dt_H = 3
-    dt = 1
+    N_traj = 200
+    dt_H = 50
+    dt = 0.2
     dt_sim = 0.2
     N_ITER = 0
 
     # kernel adding thresholds
     dst_thr = 0.05              # distance to collision (everything below - adds a kernel)
-    thr_rbf_add = 0.03          # distance to closest kernel (l2 norm of 7d vector difference)
+    thr_rbf_add = 0.1          # distance to closest kernel (l2 norm of 7d vector difference)
 
     #primary MPPI to sample naviagtion policy
     mppi = MPPI(q_0, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a, nn_model)
@@ -102,10 +117,17 @@ def main_loop():
     all_fk_kernel = []
     while torch.norm(mppi.q_cur - q_f)+1 > 0.001:
         t_iter = time.time()
+        # [ZMQ] Receive state from integrator
+        try:
+            mppi.q_cur = socket_receive_state.recv_pyobj(zmq.DONTWAIT)
+            print(f"Received state {mppi.q_cur}")
+        except:
+            pass
+
         # Sample random policies
         mppi.Policy.sample_policy()
         # Propagate modulated DS
-
+        print(f'Init state: {mppi.q_cur}')
         with record_function("TAG: general propagation"):
             all_traj, closests_dist_all, kernel_val_all = mppi.propagate()
 
@@ -121,6 +143,13 @@ def main_loop():
             rand_idx = torch.randint(kernel_candidates.shape[0], (1,))
             mppi.Policy.add_kernel(kernel_candidates[rand_idx[0]])
             kernel_fk, _ = numeric_fk_model(kernel_candidates[rand_idx[0]], dh_params, 3)
+
+        # [ZMQ] Send current policy to integrator
+        data = [mppi.Policy.n_kernels,
+                mppi.Policy.mu_c[0:mppi.Policy.n_kernels],
+                mppi.Policy.alpha_c[0:mppi.Policy.n_kernels],
+                mppi.Policy.sigma_c[0:mppi.Policy.n_kernels]]
+        socket_send_policy.send_pyobj(data)
 
 
         N_ITER += 1

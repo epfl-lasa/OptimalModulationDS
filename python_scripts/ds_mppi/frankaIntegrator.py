@@ -1,4 +1,5 @@
 import sys
+import zmq
 sys.path.append('/functions/')
 from isaac_gym_helpers import *
 from MPPI import *
@@ -13,7 +14,22 @@ if 1:
 else:
     params = {'device': 'cuda:0', 'dtype': torch.float32}
 
+
 def main_loop(gym_instance):
+    ########################################
+    ###            ZMQ SETUP             ###
+    ########################################
+    context = zmq.Context()
+    # socket to receive data from slow loop
+    socket_receive_policy = context.socket(zmq.SUB)
+    socket_receive_policy.setsockopt(zmq.CONFLATE, 1)
+    socket_receive_policy.connect("tcp://localhost:1337")
+    socket_receive_policy.setsockopt(zmq.SUBSCRIBE, b"")
+
+    # socket to publish data to slow loop
+    socket_send_state = context.socket(zmq.PUB)
+    socket_send_state.bind("tcp://*:1338")
+
     ########################################
     ###        CONTROLLER SETUP          ###
     ########################################
@@ -67,10 +83,10 @@ def main_loop(gym_instance):
 
     # Integration parameters
     A = -1 * torch.diag(torch.ones(DOF)).to(**params)
-    N_traj = 100
+    N_traj = 1
     dt_H = 3
     dt = 1
-    dt_sim = 0.2
+    dt_sim = 0.1
     N_ITER = 0
 
     #set up second mppi to move the robot
@@ -106,14 +122,30 @@ def main_loop(gym_instance):
     all_fk_kernel = []
     while torch.norm(mppi_step.q_cur - q_f)+1 > 0.001:
         t_iter = time.time()
-        # Receive policy from planner
+        # [ZMQ] Receive policy from planner
         # mppi_step.Policy.n_kernels = mppi.Policy.n_kernels
         # mppi_step.Policy.mu_c = mppi.Policy.mu_c
         # mppi_step.Policy.sigma_c = mppi.Policy.sigma_c
-        # if 0*best_idx:
-        #     mppi_step.Policy.alpha_c = mppi.Policy.alpha_tmp[best_idx]
-        # else:
-        #     mppi_step.Policy.alpha_c = mppi.Policy.alpha_c
+        try:
+            data = socket_receive_policy.recv_pyobj(zmq.DONTWAIT)
+            mppi_step.Policy.n_kernels = data[0]
+            mppi_step.Policy.mu_c[0:mppi_step.Policy.n_kernels] = data[1]
+            mppi_step.Policy.alpha_c[0:mppi_step.Policy.n_kernels] = data[2]
+            mppi_step.Policy.sigma_c[0:mppi_step.Policy.n_kernels] = data[3]
+            mppi_step.Policy.mu_c[mppi_step.Policy.n_kernels:] *= 0
+            mppi_step.Policy.alpha_c[mppi_step.Policy.n_kernels:] *= 0
+            mppi_step.Policy.sigma_c[mppi_step.Policy.n_kernels:] *= 0
+            #print(f"Received policy {iter} \n {data}")
+            #print(info)
+        except:
+            pass
+
+        if len(all_fk_kernel) != mppi_step.Policy.n_kernels:
+            all_fk_kernel = []
+            for mu in mppi_step.Policy.mu_c[0:mppi_step.Policy.n_kernels]:
+                kernel_fk, _ = numeric_fk_model(mu, dh_params, 3)
+                fk_arr = kernel_fk.flatten(0, 1) @ R_tens[0:3, 0:3] + R_tens[0:3, 3]
+                all_fk_kernel.append(fk_arr)
 
         # Propagate modulated DS
 
@@ -122,9 +154,12 @@ def main_loop(gym_instance):
         # Update current robot state
 
         # Update current robot state
-        mppi_step.Policy.sample_policy() # samples a new policy using planned means and sigmas
+        mppi_step.Policy.sample_policy()    # samples a new policy using planned means and sigmas
         _, _, _ = mppi_step.propagate()
         mppi_step.q_cur = mppi_step.q_cur + mppi_step.qdot[0, :] * dt_sim
+
+        # [ZMQ] Send current state to planner
+        socket_send_state.send_pyobj(mppi_step.q_cur)
 
         goal_fk, _ = numeric_fk_model(q_f, dh_params, 2)
         # # draw lines in gym
@@ -140,21 +175,21 @@ def main_loop(gym_instance):
         # for fk in all_fk_traj:
         #     gym_instance.draw_lines(fk, color=[1, 1, 1])
 
-        gym_instance.step()
+        # gym_instance.step()
         q_des = mppi_step.q_cur
         dq_des = mppi_step.qdot[0, :] * 0
         robot_sim.set_robot_state(q_des, dq_des, env_ptr, robot_ptr)
-        # Send current state to planner
 
         N_ITER += 1
         if N_ITER > 10000:
             break
         # print(q_cur)
         t_iter = time.time() - t_iter
+        time.sleep(max(0.0, 1/60 - t_iter))
         print(f'Iteration:{N_ITER:4d}, Time:{t_iter:4.2f}, Frequency:{1/t_iter:4.2f},',
               f' Avg. frequency:{N_ITER/(time.time()-t0):4.2f}',
               f' Kernel count:{mppi_step.Policy.n_kernels:4d}')
-        print('Position difference: %4.3f'% (mppi_step.q_cur - q_f).norm().cpu())
+        #print('Position difference: %4.3f'% (mppi_step.q_cur - q_f).norm().cpu())
     td = time.time() - t0
     print('Time: ', td)
     print('Time per iteration: ', td / N_ITER, 'Hz: ', 1 / (td / (N_ITER)))
