@@ -111,7 +111,7 @@ class MPPI:
                 else:
                     # for franka robot (meters)
                     dist_low, dist_high = 0.03, 0.1
-                    k_sigmoid = 70
+                    k_sigmoid = 300
 
                 ln_min, ln_max = 0, 1
                 ltau_min, ltau_max = 1, 2

@@ -41,42 +41,13 @@ def main_loop(gym_instance):
     q_0 = torch.tensor([-1.2, -0.08, 0, -2, -0.16,  1.6, -0.75]).to(**params)
     q_f = torch.tensor([1.2, -0.08, 0, -2, -0.16,  1.6, -0.75]).to(**params)
 
-    # q_0 = torch.tensor([-1.2, 1.2, 0.9, -1.2, 0.1, 2.2, 0.4]).to(**params)
-    # q_f = torch.tensor([1.2, 1.2, -0.9, -1.2, 0.1, 2.2, 0.4]).to(**params)
-    # q_0 = torch.tensor([-0.29, -0.12, -0.71, -2.46, 0.73, 1.88, 0.44]).to(**params)
-    # q_f = torch.tensor([0.46, -0.07, 0.60, -2.29, -0.68, 1.88, 0.44]).to(**params)
     # Robot parameters
-    dh_a = torch.zeros(DOF + 1).to(**params)
-    dh_a[1:] = L  # link length
     dh_a = torch.tensor([0, 0, 0, 0.0825, -0.0825, 0, 0.088, 0])        # "r" in matlab
     dh_d = torch.tensor([0.333, 0, 0.316, 0, 0.384, 0, 0, 0.107])       # "d" in matlab
     dh_alpha = torch.tensor([0, -pi/2, pi/2, pi/2, -pi/2, pi/2, pi/2, 0])  # "alpha" in matlab
     dh_params = torch.vstack((dh_d, dh_a*0, dh_a, dh_alpha)).T.to(**params)          # (d, theta, a (or r), alpha)
     # Obstacle spheres (x, y, z, r)
-    # obs = torch.tensor([[6, 2, 0, .5],
-    #                     [4, -1, 0, .5],
-    #                     [5, 0, 0, .5]]).to(**params)
-
-    obs = torch.tensor([[0.4, 0, 0.50, .05], #vertical bar
-                        [0.4, 0, 0.55, .05],
-                        [0.4, 0, 0.60, .05],
-                        [0.4, 0, 0.65, .05],
-                        [0.4, 0, 0.70, .05],
-                        [0.4, 0, 0.75, .05],
-                        [0.4, 0, 0.80, .05],
-                        # [0.35, 0, 0.80, .05], # top horizontal
-                        # [0.30, 0, 0.80, .05],
-                        # [0.25, 0, 0.80, .05],
-                        # [0.20, 0, 0.80, .05],
-                        # [0.15, 0, 0.80, .05],
-                        # [0.35, 0, 0.45, .05], # bottom horizontal
-                        # [0.30, 0, 0.45, .05],
-                        # [0.25, 0, 0.45, .05],
-                        # [0.20, 0, 0.45, .05],
-                        ]).to(**params)
-
     # T-bar
-
     t1 = torch.tensor([0.4, -0.3, 0.75, .04])
     t2 = t1 + torch.tensor([0, 0.6, 0, 0])
     top_bar = t1 + torch.linspace(0, 1, 10).reshape(-1, 1) * (t2 - t1)
@@ -84,9 +55,9 @@ def main_loop(gym_instance):
     t4 = t3 + torch.tensor([0, 0, -0.65, 0])
     middle_bar = t3 + torch.linspace(0, 1, 10).reshape(-1, 1) * (t4 - t3)
     bottom_bar = top_bar - torch.tensor([0, 0, 0.65, 0])
-    obs = torch.vstack((top_bar, middle_bar, bottom_bar))
+    #obs = torch.vstack((top_bar, middle_bar, bottom_bar))
     #obs = torch.vstack((middle_bar, bottom_bar))
-    #obs = middle_bar
+    obs = middle_bar
 
     n_dummy = 1
     dummy_obs = torch.hstack((torch.zeros(n_dummy, 3)+10, torch.zeros(n_dummy, 1)+0.1)).to(**params)
@@ -95,20 +66,10 @@ def main_loop(gym_instance):
     # Integration parameters
     A = -1 * torch.diag(torch.ones(DOF)).to(**params)
     N_traj = 100
-    dt_H = 10
-    dt = 0.2
+    dt_H = 3
+    dt = 1
     dt_sim = 0.2
     N_ITER = 0
-    # # kernel adding thresholds
-    # thr_dist = 0.00
-    # thr_rbf = 0.01
-
-    # mppi = MPPI(q_0, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a, nn_model)
-    # mppi.Policy.sigma_c_nominal = 0.3
-    # mppi.Policy.alpha_s = 0.3
-    # mppi.Policy.policy_upd_rate = 0.5
-    # mppi.dst_thr = 0.001
-    # mppi.ker_thr = 1e-2
 
     # kernel adding thresholds
     dst_thr = 0.05              # distance to collision (everything below - adds a kernel)
@@ -186,7 +147,7 @@ def main_loop(gym_instance):
         # Update current robot state
         mppi_step.Policy.mu_c = mppi.Policy.mu_c
         mppi_step.Policy.sigma_c = mppi.Policy.sigma_c
-        if best_idx:
+        if 0*best_idx:
             mppi_step.Policy.alpha_c = mppi.Policy.alpha_tmp[best_idx]
         else:
             mppi_step.Policy.alpha_c = mppi.Policy.alpha_c
@@ -197,9 +158,9 @@ def main_loop(gym_instance):
         _, _, _ = mppi_step.propagate()
         mppi.q_cur = mppi.q_cur + mppi_step.qdot[0, :] * dt_sim
 
-        cur_fk, _ = numeric_fk_model(mppi.q_cur, dh_params, 3)
-        goal_fk, _ = numeric_fk_model(q_f, dh_params, 3)
-        # draw lines in gym
+        # cur_fk, _ = numeric_fk_model(mppi.q_cur, dh_params, 3)
+        goal_fk, _ = numeric_fk_model(q_f, dh_params, 2)
+        # # draw lines in gym
         # draw kernels
         for fk in all_fk_kernel:
             gym_instance.draw_lines(fk, color=[1, 1, 1])

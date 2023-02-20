@@ -53,8 +53,8 @@ def main_int():
     nn_model.model_jit = torch.jit.script(nn_model.model_jit)
     nn_model.model_jit = torch.jit.optimize_for_inference(nn_model.model_jit)
 
-    nn_model.model_jit_q = torch.jit.script(nn_model.model_jit)
-    nn_model.model_jit_q = torch.jit.optimize_for_inference(nn_model.model_jit)
+    # nn_model.model_jit_q = torch.jit.script(nn_model.model_jit)
+    # nn_model.model_jit_q = torch.jit.optimize_for_inference(nn_model.model_jit)
 
     nn_model.update_aot_lambda()
 
