@@ -1,4 +1,4 @@
-import sys
+import sys, yaml
 import zmq
 sys.path.append('../functions/')
 from MPPI import *
@@ -16,18 +16,22 @@ else:
 
 
 def main_loop():
+
+    with open('config.yaml') as file:
+        config = yaml.load(file, Loader=yaml.FullLoader)
+
     ########################################
     ###            ZMQ SETUP             ###
     ########################################
     context = zmq.Context()
     # socket to publish data to fast loop
     socket_send_policy = context.socket(zmq.PUB)
-    socket_send_policy.bind("tcp://*:1337")
+    socket_send_policy.bind("tcp://*:%d" % config["zmq"]["policy_port"])
 
     # socket to receive data from fast loop
     socket_receive_state = context.socket(zmq.SUB)
     socket_receive_state.setsockopt(zmq.CONFLATE, 1)
-    socket_receive_state.connect("tcp://localhost:1338")
+    socket_receive_state.connect("tcp://localhost:%d" % config["zmq"]["state_port"])
     socket_receive_state.setsockopt(zmq.SUBSCRIBE, b"")
 
     ########################################
@@ -38,15 +42,8 @@ def main_loop():
     L = 1
 
     # Load nn model
-    s = 256
-    n_layers = 5
-    skips = []
-    #fname = '%ddof_sdf_%dx%d_mesh.pt' % (DOF, s, n_layers) # planar robot
-    fname = 'franka_%dx%d.pt' % (s, n_layers)  # franka robot
-
-    if skips == []:
-        n_layers -= 1
-    nn_model = RobotSdfCollisionNet(in_channels=DOF+3, out_channels=9, layers=[s] * n_layers, skips=skips)
+    fname = config["collision_model"]["fname"]
+    nn_model = RobotSdfCollisionNet(in_channels=DOF+3, out_channels=9, layers=[256] * 4, skips=[])
     nn_model.load_weights('../mlp_learn/models/' + fname, params)
     nn_model.model.to(**params)
     # prepare models: standard (used for AOT implementation), jit, jit+quantization
@@ -56,8 +53,8 @@ def main_loop():
     nn_model.update_aot_lambda()
     #nn_model.model.eval()
     # Initial state
-    q_0 = torch.tensor([-1.2, -0.08, 0, -2, -0.16,  1.6, -0.75]).to(**params)
-    q_f = torch.tensor([1.2, -0.08, 0, -2, -0.16,  1.6, -0.75]).to(**params)
+    q_0 = torch.tensor(config['general']['q_0']).to(**params)
+    q_f = torch.tensor(config['general']['q_f']).to(**params)
 
     # Robot parameters
     dh_a = torch.tensor([0, 0, 0, 0.0825, -0.0825, 0, 0.088, 0])        # "r" in matlab
@@ -66,16 +63,16 @@ def main_loop():
     dh_params = torch.vstack((dh_d, dh_a*0, dh_a, dh_alpha)).T.to(**params)          # (d, theta, a (or r), alpha)
     # Obstacle spheres (x, y, z, r)
     # T-bar
-    t1 = torch.tensor([0.4, -0.3, 0.75, .04])
+    t1 = torch.tensor([0.4, -0.3, 0.75, .05])
     t2 = t1 + torch.tensor([0, 0.6, 0, 0])
     top_bar = t1 + torch.linspace(0, 1, 10).reshape(-1, 1) * (t2 - t1)
     t3 = t1 + 0.5 * (t2 - t1)
     t4 = t3 + torch.tensor([0, 0, -0.65, 0])
-    middle_bar = t3 + torch.linspace(0, 1, 10).reshape(-1, 1) * (t4 - t3)
+    middle_bar = t3 + torch.linspace(0, 1, 20).reshape(-1, 1) * (t4 - t3)
     bottom_bar = top_bar - torch.tensor([0, 0, 0.65, 0])
-    #obs = torch.vstack((top_bar, middle_bar, bottom_bar))
+    obs = torch.vstack((top_bar, middle_bar, bottom_bar))
     #obs = torch.vstack((middle_bar, bottom_bar))
-    obs = middle_bar
+    #obs = middle_bar
 
     n_dummy = 1
     dummy_obs = torch.hstack((torch.zeros(n_dummy, 3)+10, torch.zeros(n_dummy, 1)+0.1)).to(**params)
@@ -83,30 +80,29 @@ def main_loop():
 
     # Integration parameters
     A = -1 * torch.diag(torch.ones(DOF)).to(**params)
-    N_traj = 200
-    dt_H = 50
-    dt = 0.2
-    dt_sim = 0.2
+    N_traj = config['planner']['n_trajectories']
+    dt_H = config['planner']['horizon']
+    dt = config['planner']['dt']
     N_ITER = 0
 
     # kernel adding thresholds
-    dst_thr = 0.05              # distance to collision (everything below - adds a kernel)
-    thr_rbf_add = 0.1          # distance to closest kernel (l2 norm of 7d vector difference)
+    dst_thr = config['planner']['kernel_adding_collision_thr']       # distance to collision (everything below - adds a kernel)
+    thr_rbf_add = config['planner']['kernel_adding_kernels_thr']   # distance to closest kernel (l2 norm of 7d vector difference)
 
     #primary MPPI to sample naviagtion policy
     mppi = MPPI(q_0, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a, nn_model)
-    mppi.Policy.sigma_c_nominal = 1
-    mppi.Policy.alpha_s = 0.3
-    mppi.Policy.policy_upd_rate = 0.5
-    mppi.dst_thr = dst_thr/2    # substracted from actual distance (added threshsold)
-    mppi.ker_thr = 1e-3         # used to create update mask for policy means
+    mppi.Policy.sigma_c_nominal = config['planner']['kernel_width']
+    mppi.Policy.alpha_s = config['planner']['alpha_sampling_sigma']
+    mppi.Policy.policy_upd_rate = config['planner']['policy_update_rate']
+    mppi.dst_thr = dst_thr*0.5                                    # subtracted from actual distance (added threshsold)
+    mppi.ker_thr = config['planner']['kernel_update_threshold']   # used to create update mask for policy means
 
 
     ########################################
     ###     RUN MPPI AND SIMULATE        ###
     ########################################
     # warmup jit
-    for i in range(20):
+    for i in range(3):
         mppi.Policy.sample_policy()
         _, _, _ = mppi.propagate()
         numeric_fk_model(mppi.q_cur, dh_params, 10)
