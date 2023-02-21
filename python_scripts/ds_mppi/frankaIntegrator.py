@@ -114,8 +114,8 @@ def main_loop():
         socket_send_state.send_pyobj(q_des)
 
         N_ITER += 1
-        if N_ITER > 10000:
-            break
+        if torch.norm(mppi_step.q_cur - q_f) < 0.2:
+            mppi_step.q_cur = q_0
         # print(q_cur)
 
         t_iter_tmp = time.time() - t_iter_start

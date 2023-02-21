@@ -7,12 +7,14 @@ import time
 from zmq_utils import *
 import yaml
 
+sys.path.append('functions/')
+from pybullet_panda_sim import PandaSim
+from pybullet_obstacles_spheres import SphereManager
+
 def main_loop():
     with open('config.yaml') as file:
         config = yaml.load(file, Loader=yaml.FullLoader)
 
-    sys.path.append('functions/')
-    from pybullet_panda_sim import PandaSim
 
     p.connect(p.GUI, options='--background_color_red=0.2 --background_color_green=0.2' +
                              ' --background_color_blue=0.2 --width=1600 --height=1000')
@@ -43,12 +45,15 @@ def main_loop():
     desired_frequency = config["simulator"]["max_frequency"]
     #state = [-1.2, -0.08, 0, -2, -0.16,  1.6, -0.75]
     state = config["general"]["q_0"]
-    obs = None
+    obs = []
+    sphere_manager = SphereManager(p)
     ## main loop
+    i = 0
     while True:
         t_iter_begin = time.time()
         # [ZMQ] Receive obstacles
         obs = zmq_try_recv(obs, socket_receive_obs)
+        sphere_manager.update_spheres(obs)
 
         # [ZMQ] Receive state from integrator
         state = zmq_try_recv(state, socket_receive_state)
@@ -57,6 +62,10 @@ def main_loop():
         t_iter_end = time.time()
         t_iter = t_iter_end - t_iter_begin
         time.sleep(max(t_iter-1/desired_frequency, 0))
+
+        i += 1
+        if i % desired_frequency == 0:
+            print(f"Simulating at {desired_frequency} Hz for {int(i/120)} seconds.")
 
 
 if __name__ == '__main__':

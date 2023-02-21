@@ -33,14 +33,13 @@ def main_loop():
     obs = torch.vstack((obs, dummy_obs)).to(**params)
 
     i = 0
-    freq = 120
+    freq = config["obstacle_streamer"]["frequency"]
     while True:
         socket_send_obs.send_pyobj(obs)
         time.sleep(1/freq)
         i += 1
         if i % freq == 0:
             print(f"Streaming at {freq} Hz for {i/120} seconds.")
-
 
 if __name__ == '__main__':
     main_loop()

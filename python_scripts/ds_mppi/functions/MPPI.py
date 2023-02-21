@@ -151,8 +151,8 @@ class MPPI:
                 mod_velocity = torch.nan_to_num(mod_velocity / mod_velocity_norm)
                 # slow down and repulsion for collision case
                 mod_velocity[distance < 0] *= 0.1
-                # repulsion_velocity = E[:, :, 0] * nominal_velocity_norm*0.01
-                # mod_velocity[distance < 0] += repulsion_velocity[distance < 0]
+                repulsion_velocity = E[:, :, 0] * nominal_velocity_norm*0.05
+                mod_velocity[distance < 0] += repulsion_velocity[distance < 0]
             with record_function("TAG: Propagate"):
                 # propagate
                 self.all_traj[:, i, :] = self.all_traj[:, i - 1, :] + self.dt * mod_velocity

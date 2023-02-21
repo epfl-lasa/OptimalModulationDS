@@ -133,7 +133,6 @@ def main_loop():
         #print('Position difference: %4.3f'% (mppi.q_cur - q_f).norm().cpu())
     td = time.time() - t0
     print('Time: ', td)
-    #print(torch_profiler.key_averages().table(sort_by="cpu_time_total", row_limit=20))
     time.sleep(10)
 
 
