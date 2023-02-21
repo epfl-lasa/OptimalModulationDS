@@ -2,6 +2,7 @@ import sys, yaml
 import zmq
 sys.path.append('../functions/')
 from MPPI import *
+from zmq_utils import *
 import torch
 
 sys.path.append('../mlp_learn/')
@@ -9,6 +10,7 @@ from sdf.robot_sdf import RobotSdfCollisionNet
 
 # define tensor parameters (cpu or cuda:0 or mps)
 params = {'device': 'cpu', 'dtype': torch.float32}
+
 
 def main_loop():
 
@@ -19,15 +21,14 @@ def main_loop():
     ###            ZMQ SETUP             ###
     ########################################
     context = zmq.Context()
-    # socket to publish data to fast loop
-    socket_send_policy = context.socket(zmq.PUB)
-    socket_send_policy.bind("tcp://*:%d" % config["zmq"]["policy_port"])
+    # socket to publish policy from integrator loop
+    socket_send_policy = init_publisher(context, '*', config["zmq"]["policy_port"])
 
-    # socket to receive data from fast loop
-    socket_receive_state = context.socket(zmq.SUB)
-    socket_receive_state.setsockopt(zmq.CONFLATE, 1)
-    socket_receive_state.connect("tcp://localhost:%d" % config["zmq"]["state_port"])
-    socket_receive_state.setsockopt(zmq.SUBSCRIBE, b"")
+    # socket to receive state from integrator loop
+    socket_receive_state = init_subscriber(context, 'localhost', config["zmq"]["state_port"])
+
+    # socket to receive obstacles
+    socket_receive_obs = init_subscriber(context, 'localhost', config["zmq"]["obstacle_port"])
 
     ########################################
     ###        CONTROLLER SETUP          ###
@@ -56,22 +57,6 @@ def main_loop():
     dh_d = torch.tensor([0.333, 0, 0.316, 0, 0.384, 0, 0, 0.107])       # "d" in matlab
     dh_alpha = torch.tensor([0, -pi/2, pi/2, pi/2, -pi/2, pi/2, pi/2, 0])  # "alpha" in matlab
     dh_params = torch.vstack((dh_d, dh_a*0, dh_a, dh_alpha)).T.to(**params)          # (d, theta, a (or r), alpha)
-    # Obstacle spheres (x, y, z, r)
-    # T-bar
-    t1 = torch.tensor([0.4, -0.3, 0.75, .05])
-    t2 = t1 + torch.tensor([0, 0.6, 0, 0])
-    top_bar = t1 + torch.linspace(0, 1, 10).reshape(-1, 1) * (t2 - t1)
-    t3 = t1 + 0.5 * (t2 - t1)
-    t4 = t3 + torch.tensor([0, 0, -0.65, 0])
-    middle_bar = t3 + torch.linspace(0, 1, 20).reshape(-1, 1) * (t4 - t3)
-    bottom_bar = top_bar - torch.tensor([0, 0, 0.65, 0])
-    obs = torch.vstack((top_bar, middle_bar, bottom_bar))
-    #obs = torch.vstack((middle_bar, bottom_bar))
-    #obs = middle_bar
-
-    n_dummy = 1
-    dummy_obs = torch.hstack((torch.zeros(n_dummy, 3)+10, torch.zeros(n_dummy, 1)+0.1)).to(**params)
-    obs = torch.vstack((obs, dummy_obs)).to(**params)
 
     # Integration parameters
     A = -1 * torch.diag(torch.ones(DOF)).to(**params)
@@ -84,6 +69,8 @@ def main_loop():
     dst_thr = config['planner']['kernel_adding_collision_thr']       # distance to collision (everything below - adds a kernel)
     thr_rbf_add = config['planner']['kernel_adding_kernels_thr']   # distance to closest kernel (l2 norm of 7d vector difference)
 
+    # [ZMQ] Receive obstacles
+    obs = zmq_init_recv(socket_receive_obs)
     #primary MPPI to sample naviagtion policy
     mppi = MPPI(q_0, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a, nn_model)
     mppi.Policy.sigma_c_nominal = config['planner']['kernel_width']
@@ -96,22 +83,16 @@ def main_loop():
     ########################################
     ###     RUN MPPI AND SIMULATE        ###
     ########################################
-    # warmup jit
-    for i in range(3):
-        mppi.Policy.sample_policy()
-        _, _, _ = mppi.propagate()
-        numeric_fk_model(mppi.q_cur, dh_params, 10)
+
     print('Init time: %4.2fs' % (time.time() - t00))
     time.sleep(1)
     t0 = time.time()
     while torch.norm(mppi.q_cur - q_f)+1 > 0.001:
         t_iter = time.time()
         # [ZMQ] Receive state from integrator
-        try:
-            mppi.q_cur = socket_receive_state.recv_pyobj(zmq.DONTWAIT)
-            print(f"Received state {mppi.q_cur}")
-        except:
-            pass
+        mppi.q_cur = zmq_try_recv(mppi.q_cur, socket_receive_state)
+        # [ZMQ] Receive obstacles
+        mppi.obs = zmq_try_recv(mppi.obs, socket_receive_obs)
 
         # Sample random policies
         mppi.Policy.sample_policy()

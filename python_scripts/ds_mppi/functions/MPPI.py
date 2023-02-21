@@ -7,6 +7,8 @@ from math import pi
 from torch.profiler import record_function
 import asyncio
 
+
+
 @torch.jit.script
 def get_mindist(all_links, obs):
     mindists = dist_tens(all_links, obs)
@@ -50,6 +52,11 @@ class MPPI:
         self.dst_thr = 0.5
         self.qdot = torch.zeros((self.N_traj, self.n_dof)).to(**self.tensor_args)
         self.ker_thr = 1e-3
+        for tmp in range(5):
+            self.Policy.sample_policy()
+            _, _, _ = self.propagate()
+            numeric_fk_model(self.q_cur, dh_params, 10)
+            print('Warmup done')
 
     def reset_tensors(self):
         self.all_traj = self.all_traj * 0

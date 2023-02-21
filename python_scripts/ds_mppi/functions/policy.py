@@ -77,6 +77,17 @@ class TensorPolicyMPPI:
             # Update weights
             self.alpha_c[0:self.n_kernels] = (1 - upd_tens[:, None]) * self.alpha_c[0:self.n_kernels] + upd_tens[:, None] * alpha_cur_sum
 
+    def update_with_data(self, data):
+        if data is not None:
+            self.n_kernels = data[0]
+            self.mu_c[0:self.n_kernels] = data[1]
+            self.alpha_c[0:self.n_kernels] = data[2]
+            self.sigma_c[0:self.n_kernels] = data[3]
+            self.mu_c[self.n_kernels:] *= 0
+            self.alpha_c[self.n_kernels:] *= 0
+            self.sigma_c[self.n_kernels:] *= 0
+        else:
+            pass
     def add_kernel(self, q):
         # Add a new kernel centered at q
         if self.n_kernels < self.N_KERNEL_MAX:
