@@ -13,8 +13,8 @@ zmq:
 
 planner:
   # sampling params
-  n_trajectories: 100
-  horizon: 20
+  n_trajectories: 5
+  horizon: 10
   dt: 0.5
   collision_threshold: 0.05
 

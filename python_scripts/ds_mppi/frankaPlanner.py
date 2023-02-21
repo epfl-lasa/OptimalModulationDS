@@ -3,17 +3,12 @@ import zmq
 sys.path.append('../functions/')
 from MPPI import *
 import torch
-from math import pi
 
 sys.path.append('../mlp_learn/')
 from sdf.robot_sdf import RobotSdfCollisionNet
 
-# define tensor parameters (cpu or cuda:0)
-if 1:
-    params = {'device': 'cpu', 'dtype': torch.float32}
-else:
-    params = {'device': 'cuda:0', 'dtype': torch.float32}
-
+# define tensor parameters (cpu or cuda:0 or mps)
+params = {'device': 'cpu', 'dtype': torch.float32}
 
 def main_loop():
 
@@ -106,11 +101,9 @@ def main_loop():
         mppi.Policy.sample_policy()
         _, _, _ = mppi.propagate()
         numeric_fk_model(mppi.q_cur, dh_params, 10)
-    best_idx = -1
     print('Init time: %4.2fs' % (time.time() - t00))
     time.sleep(1)
     t0 = time.time()
-    all_fk_kernel = []
     while torch.norm(mppi.q_cur - q_f)+1 > 0.001:
         t_iter = time.time()
         # [ZMQ] Receive state from integrator
@@ -123,15 +116,15 @@ def main_loop():
         # Sample random policies
         mppi.Policy.sample_policy()
         # Propagate modulated DS
-        print(f'Init state: {mppi.q_cur}')
+        # print(f'Init state: {mppi.q_cur}')
         with record_function("TAG: general propagation"):
             all_traj, closests_dist_all, kernel_val_all = mppi.propagate()
 
         with record_function("TAG: cost calculation"):
             # Calculate cost
-            cost = mppi.get_cost()
-            best_idx = torch.argmin(cost)
+            cost = mppi.get_cost() # don't delete, writes to self.cost
             mppi.shift_policy_means()
+
         # Check trajectory for new kernel candidates and add policy kernels
         kernel_candidates = mppi.Policy.check_traj_for_kernels(all_traj, closests_dist_all, dst_thr, thr_rbf_add)
 

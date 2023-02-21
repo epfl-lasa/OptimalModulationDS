@@ -8,12 +8,8 @@ import torch
 sys.path.append('../mlp_learn/')
 from sdf.robot_sdf import RobotSdfCollisionNet
 
-# define tensor parameters (cpu or cuda:0)
-if 1:
-    params = {'device': 'cpu', 'dtype': torch.float32}
-else:
-    params = {'device': 'cuda:0', 'dtype': torch.float32}
-
+# define tensor parameters (cpu or cuda:0 or mps)
+params = {'device': 'cpu', 'dtype': torch.float32}
 
 def main_loop(gym_instance):
 
@@ -193,5 +189,4 @@ if __name__ == '__main__':
     sim_params = load_yaml(join_path(get_gym_configs_path(), 'physx.yml'))
     gym_instance = Gym(**sim_params)
     main_loop(gym_instance)
-
 

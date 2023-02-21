@@ -2,6 +2,7 @@ from policy import *
 from cost import *
 from fk_num import *
 from fk_sym_gen import *
+from math import pi
 
 from torch.profiler import record_function
 import asyncio
@@ -222,6 +223,10 @@ class MPPI:
         w = w / w.sum()
         noupd_mask = self.kernel_val_all[:, :, 0:self.Policy.n_kernels].sum(1).mean(0) < self.ker_thr
         self.Policy.update_policy(w, self.policy_upd_rate, noupd_mask)
+        return 0
+
+    def update_obstacles(self, obs):
+        self.obs = obs
         return 0
 
 def generalized_sigmoid(x, y_min, y_max, x0, x1, k):
