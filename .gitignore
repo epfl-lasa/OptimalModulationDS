@@ -5,7 +5,7 @@
 # Object files
 *.o
 *.ko
-*.obj
+#*.obj #allow for meshes
 *.elf
 
 # Traces
@@ -53,3 +53,7 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+#mac cache
+python_scripts/mlp_learn/sdf/__pycache__/*
+*/__pycache__/*
+*/.pytest_cache/*
