@@ -116,6 +116,8 @@ def main_loop():
         N_ITER += 1
         if torch.norm(mppi_step.q_cur - q_f) < 0.2:
             mppi_step.q_cur = q_0
+            socket_send_state.send_pyobj(mppi_step.q_cur)
+            time.sleep(1)
         # print(q_cur)
 
         t_iter_tmp = time.time() - t_iter_start

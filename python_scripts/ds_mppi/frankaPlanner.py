@@ -76,7 +76,7 @@ def main_loop():
     mppi.Policy.sigma_c_nominal = config['planner']['kernel_width']
     mppi.Policy.alpha_s = config['planner']['alpha_sampling_sigma']
     mppi.Policy.policy_upd_rate = config['planner']['policy_update_rate']
-    mppi.dst_thr = dst_thr*0.5                                    # subtracted from actual distance (added threshsold)
+    mppi.dst_thr = config['planner']['collision_threshold']       # subtracted from actual distance (added threshsold)
     mppi.ker_thr = config['planner']['kernel_update_threshold']   # used to create update mask for policy means
 
 

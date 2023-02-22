@@ -8,12 +8,10 @@ pandaNumDofs = 7
 # restpose
 rp = [0.98, 0.458, 0.31, -2.24, -0.30, 2.66, 2.32, 0.02, 0.02]
 
-
-
 class PandaSim():
     def __init__(self, bullet_client, base_pos, base_rot):
         self.bullet_client = bullet_client
-        bullet_client.setAdditionalSearchPath('content/urdfs/')
+        self.bullet_client.setAdditionalSearchPath('content/urdfs')
         self.base_pos = np.array(base_pos)
         self.base_rot = np.array(base_rot)
         # print("offset=",offset)

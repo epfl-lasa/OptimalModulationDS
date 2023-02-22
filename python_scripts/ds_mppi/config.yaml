@@ -15,15 +15,15 @@ zmq:
 planner:
   # sampling params
   n_trajectories: 100
-  horizon: 10
-  dt: 0.5
-  collision_threshold: 0.00
+  horizon: 5
+  dt: 1
+  collision_threshold: 0.03
 
   # navigation kernel params
   kernel_width: 1
   alpha_sampling_sigma: 0.3
-  policy_update_rate: 0.8
-  kernel_update_threshold: 0.01
+  policy_update_rate: 0.5
+  kernel_update_threshold: 0.001
 
   # navigation kernel adding params
   kernel_adding_collision_thr: 0.05
@@ -32,9 +32,9 @@ planner:
 integrator:
   n_trajectories: 1
   horizon: 2
-  dt: 0.01
+  dt: 0.03
   collision_threshold: 0.00
-  desired_frequency: 250
+  desired_frequency: 100
 
 simulator:
   max_frequency: 250
