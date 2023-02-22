@@ -20,13 +20,23 @@ def main_loop():
     socket_send_obs.bind("tcp://*:%d" % config["zmq"]["obstacle_port"])
 
 
-    t1 = torch.tensor([0.4, -0.3, 0.75, .05])
-    t2 = t1 + torch.tensor([0, 0.6, 0, 0])
-    top_bar = t1 + torch.linspace(0, 1, 10).reshape(-1, 1) * (t2 - t1)
-    t3 = t1 + 0.5 * (t2 - t1)
-    t4 = t3 + torch.tensor([0, 0, -0.65, 0])
-    middle_bar = t3 + torch.linspace(0, 1, 20).reshape(-1, 1) * (t4 - t3)
-    bottom_bar = top_bar - torch.tensor([0, 0, 0.65, 0])
+    ### I-Shape centered in front of franka
+    x_dist = 0.5
+    y_width = 0.4
+    z_0 = 0.1
+    height = 0.75
+    r = 0.05
+    n_vertical = 20
+    n_horizontal = 20
+
+    top_left = torch.tensor([x_dist, -y_width, z_0+height, r])
+    top_right = torch.tensor([x_dist, y_width, z_0+height, r])
+    top_bar = top_left + torch.linspace(0, 1, n_horizontal).reshape(-1, 1) * (top_right - top_left)
+    bottom_bar = top_bar - torch.tensor([0, 0, height, 0])
+
+    top_mid = top_left + 0.5 * (top_right - top_left)
+    bottom_mid = top_mid - torch.tensor([0, 0, height, 0])
+    middle_bar = bottom_mid + torch.linspace(0, 1, n_vertical).reshape(-1, 1) * (top_mid - bottom_mid)
     obs = torch.vstack((top_bar, middle_bar, bottom_bar))
     # obs = torch.vstack((middle_bar, bottom_bar))
     n_dummy = 1

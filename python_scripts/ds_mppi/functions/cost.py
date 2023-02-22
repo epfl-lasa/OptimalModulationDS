@@ -9,9 +9,9 @@ class Cost:
         self.goal_fk = numeric_fk_model(self.qf, self.dh_params, 2)[0]
     def evaluate_costs(self, all_traj, closest_dist_all):
         goal_cost = self.goal_cost(all_traj[:, -1, :], self.qf)
-        collision_cost = 500 * self.collision_cost(closest_dist_all)
-        joint_limits_cost = 500 * self.joint_limits_cost(all_traj)
-        stagnation_cost = 100 * goal_cost * self.stagnation_cost(all_traj)
+        collision_cost = self.collision_cost(closest_dist_all)
+        joint_limits_cost = self.joint_limits_cost(all_traj)
+        stagnation_cost = 100*goal_cost * self.stagnation_cost(all_traj)
 
         fk_cost = 10*self.fk_cost(all_traj[:, -1, :])
 
@@ -19,7 +19,7 @@ class Cost:
         return total_cost
 
     def goal_cost(self, traj_end, qf):
-        return (traj_end - qf).norm(2, dim=1)
+        return (traj_end - qf).norm(0.5, dim=1)
 
     def fk_cost(self, traj_end):
         traj_end_fk = numeric_fk_model_vec(traj_end, self.dh_params, 2)[0]

@@ -93,6 +93,7 @@ class MPPI:
                 distance, self.nn_grad = self.distance_repulsion_nn(q_prev)
                 self.nn_grad = self.nn_grad[0:self.N_traj, :] #fixes issue with aot_function cache
                 #distance, self.nn_grad = self.distance_repulsion_fk(q_prev) #not implemented for Franka
+
                 distance -= self.dst_thr
                 self.closest_dist_all[:, i - 1] = distance
 
@@ -122,7 +123,7 @@ class MPPI:
                     k_sigmoid = 300
 
                 ln_min, ln_max = 0, 1
-                ltau_min, ltau_max = 1, 2
+                ltau_min, ltau_max = 1, 3
                 l_n = generalized_sigmoid(distance, ln_min, ln_max, dist_low, dist_high, k_sigmoid)
                 l_tau = generalized_sigmoid(distance, ltau_max, ltau_min, dist_low, dist_high, k_sigmoid)
                 # self.D = self.D * 0 + torch.eye(self.n_dof).to(**self.tensor_args)
@@ -140,6 +141,7 @@ class MPPI:
                 #policy_velocity += ((1-l_n)/100).unsqueeze(1) * E[:, :, 0]
                 # calculate modulated vector field (and normalize)
                 nominal_velocity_norm = torch.norm(nominal_velocity, dim=1).reshape(-1, 1)
+                # TODO CHECK POLICY VELOCITY NORMALIZATION (it's way less than 1)
                 policy_velocity = policy_velocity * nominal_velocity_norm             # magnitude of nominal velocity
                 total_velocity = nominal_velocity + policy_velocity                   # magnitude of 2x nominal velocity
                 total_velocity_norm = torch.norm(total_velocity, dim=1).unsqueeze(1)
@@ -150,8 +152,8 @@ class MPPI:
                 mod_velocity_norm[mod_velocity_norm <= 0.5] = 1
                 mod_velocity = torch.nan_to_num(mod_velocity / mod_velocity_norm)
                 # slow down and repulsion for collision case
-                mod_velocity[distance < 0] *= 0.1
-                repulsion_velocity = E[:, :, 0] * nominal_velocity_norm*0.05
+                #mod_velocity[distance < 0] *= 0.01
+                repulsion_velocity = E[:, :, 0] * nominal_velocity_norm
                 mod_velocity[distance < 0] += repulsion_velocity[distance < 0]
             with record_function("TAG: Propagate"):
                 # propagate

@@ -79,20 +79,24 @@ def main_loop():
     mppi.dst_thr = config['planner']['collision_threshold']       # subtracted from actual distance (added threshsold)
     mppi.ker_thr = config['planner']['kernel_update_threshold']   # used to create update mask for policy means
 
-
+    all_kernel_fk = []
     ########################################
     ###     RUN MPPI AND SIMULATE        ###
     ########################################
 
     print('Init time: %4.2fs' % (time.time() - t00))
-    time.sleep(1)
     t0 = time.time()
     while torch.norm(mppi.q_cur - q_f)+1 > 0.001:
         t_iter = time.time()
         # [ZMQ] Receive state from integrator
-        mppi.q_cur = zmq_try_recv(mppi.q_cur, socket_receive_state)
+        mppi.q_cur, state_recv_status = zmq_try_recv(mppi.q_cur, socket_receive_state)
+        if state_recv_status and (mppi.q_cur - q_0).norm().numpy() < 1e-6:
+            print('Resetting policy')
+            mppi.Policy.reset_policy()
+            all_kernel_fk = []
+
         # [ZMQ] Receive obstacles
-        mppi.obs = zmq_try_recv(mppi.obs, socket_receive_obs)
+        mppi.obs, obs_recv_status = zmq_try_recv(mppi.obs, socket_receive_obs)
 
         # Sample random policies
         mppi.Policy.sample_policy()
@@ -107,18 +111,23 @@ def main_loop():
             mppi.shift_policy_means()
 
         # Check trajectory for new kernel candidates and add policy kernels
-        kernel_candidates = mppi.Policy.check_traj_for_kernels(all_traj, closests_dist_all, dst_thr, thr_rbf_add)
+        kernel_candidates = mppi.Policy.check_traj_for_kernels(all_traj, closests_dist_all, dst_thr - mppi.dst_thr, thr_rbf_add)
 
         if len(kernel_candidates) > 0:
-            rand_idx = torch.randint(kernel_candidates.shape[0], (1,))
-            mppi.Policy.add_kernel(kernel_candidates[rand_idx[0]])
-            kernel_fk, _ = numeric_fk_model(kernel_candidates[rand_idx[0]], dh_params, 3)
+            rand_idx = torch.randint(kernel_candidates.shape[0], (1,))[0]
+            closest_idx = torch.norm(kernel_candidates - mppi.q_cur, 2, -1).argmin()
+            idx_to_add = closest_idx
+            mppi.Policy.add_kernel(kernel_candidates[idx_to_add])
+            kernel_fk, _ = numeric_fk_model(kernel_candidates[idx_to_add], dh_params, 2)
+            all_kernel_fk.append(kernel_fk[1:].flatten(0, 1))
 
         # [ZMQ] Send current policy to integrator
         data = [mppi.Policy.n_kernels,
                 mppi.Policy.mu_c[0:mppi.Policy.n_kernels],
                 mppi.Policy.alpha_c[0:mppi.Policy.n_kernels],
-                mppi.Policy.sigma_c[0:mppi.Policy.n_kernels]]
+                mppi.Policy.sigma_c[0:mppi.Policy.n_kernels],
+                all_kernel_fk]
+
         socket_send_policy.send_pyobj(data)
 
 

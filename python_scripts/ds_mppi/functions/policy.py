@@ -25,11 +25,18 @@ class TensorPolicyMPPI:
         # Policy sigmas
         self.mu_s = torch.tensor(0, **self.params)
         self.sigma_s = torch.tensor(0.0, **self.params)
-        self.alpha_s = torch.tensor(0.5, **self.params)
+        self.alpha_s = torch.tensor(0.0, **self.params)
         # sampled policy
         self.mu_tmp = torch.zeros((self.n_traj, self.N_KERNEL_MAX, self.n_dof), **self.params)
         self.sigma_tmp = torch.zeros((self.n_traj, self.N_KERNEL_MAX), **self.params)
         self.alpha_tmp = torch.zeros((self.n_traj, self.N_KERNEL_MAX, self.n_dof - 1), **self.params)
+
+    def reset_policy(self):
+        # Reset policy parameters
+        self.n_kernels = 0
+        self.mu_c *= 0
+        self.sigma_c *= 0
+        self.alpha_c *= 0
 
     def sample_policy(self):
         # Sample centers
@@ -50,6 +57,10 @@ class TensorPolicyMPPI:
                                                 + self.sigma_c[:self.n_kernels]
         self.alpha_tmp[:, :self.n_kernels] = self.alpha_tmp[:, :self.n_kernels].normal_(mean=0, std=self.alpha_s) \
                                                 + self.alpha_c[:self.n_kernels]
+        # # normalize alpha, as they must represent a vector
+        self.alpha_tmp[:, :self.n_kernels] = self.alpha_tmp[:, :self.n_kernels] / \
+                                            torch.norm(self.alpha_tmp[:, :self.n_kernels], dim=2, keepdim=True)
+        self.alpha_tmp[:, :self.n_kernels] = torch.nan_to_num(self.alpha_tmp[:, :self.n_kernels])
     def update_policy(self, w, upd_rate, noupd_mask=None):
         # Update policy parameters, use current state(mu_c, sigma_c and alpha_c)
         # and a sampled policy (mu_tmp, sigma_tmp, alpha_tmp) with weights w
@@ -112,17 +123,21 @@ class TensorPolicyMPPI:
         # all_traj: all trajectories
         # closests_dist_all: distance to closest obstacle for each point of each trajectory
         # return: potential kernel centers
+        # check if any point of any trajectory is close to an obstacle
         idx_close = closests_dist_all < thr_dist
-        if self.n_kernels>0:
-            diff_ker_centers = all_traj.view(-1, self.n_dof) - self.mu_c[0:self.n_kernels].unsqueeze(1)
-            dist_ker_centers = diff_ker_centers.norm(-1, 2).view(-1, self.n_traj, all_traj.shape[1])
-            mindist_ker_centers = torch.min(dist_ker_centers, 0)[0]
-            idx_no_kernel = mindist_ker_centers > thr_kernel
+        close_candidates = all_traj[idx_close].view(-1, self.n_dof)
+        # then check if any of these points is far from a kernel
+        if self.n_kernels > 0:
+            rbf_val_candidates = eval_rbf_simple(close_candidates, self.mu_c[0:self.n_kernels], self.sigma_c[0:self.n_kernels])
+            rbf_val_closest = torch.max(rbf_val_candidates, -1)[0]
+            idx_no_kernel = (rbf_val_closest < thr_kernel)
+            # diff_ker_centers = all_traj.view(-1, self.n_dof) - self.mu_c[0:self.n_kernels].unsqueeze(1)
+            # dist_ker_centers = diff_ker_centers.norm(p=1, dim=2).view(-1, self.n_traj, all_traj.shape[1])
+            # mindist_ker_centers = torch.min(dist_ker_centers, 0)[0]
+            # idx_no_kernel = mindist_ker_centers > thr_kernel
         else:
-            idx_no_kernel = torch.ones_like(idx_close)
-        idx_candidates = idx_close * idx_no_kernel
-        # candidates = torch.unique(all_traj[idx_candidates], dim=0)
-        candidates = all_traj[idx_candidates]
+            idx_no_kernel = torch.arange(0, close_candidates.shape[0])
+        candidates = close_candidates[idx_no_kernel]
         return candidates
 
 
@@ -138,7 +153,6 @@ def eval_rbf(q: torch.Tensor,
              mu: torch.Tensor,
              sigma: torch.Tensor):
     # Evaluate policy at q
-    # alphas: weights of RBF kernels
     # mu: centers of RBF kernels
     # sigma: standard deviations of RBF kernels
     # q: state
@@ -148,28 +162,41 @@ def eval_rbf(q: torch.Tensor,
     exp_term = torch.exp(-numerator / denominator)
     return exp_term
 
+def eval_rbf_simple(q: torch.Tensor,
+             mu: torch.Tensor,
+             sigma: torch.Tensor):
+    # Evaluate policy at q
+    # mu: centers of RBF kernels
+    # sigma: standard deviations of RBF kernels
+    # q: state
+    # return: rbf value
+    numerator = torch.norm(q[:, None, :] - mu, 2, -1) ** 2
+    denominator = 2 * sigma ** 2
+    exp_term = torch.exp(-numerator / denominator)
+    return exp_term
 
-def check_traj_for_kernels(all_traj, closests_dist_all, kernel_val_all, thr_dist, thr_kernel):
-    # Check if a trajectory has encountered an obstacle
-    # If yes, output this position as potential kernel center
-    # all_traj: all trajectories
-    # closests_dist_all: distance to closest obstacle for each point of each trajectory
-    # kernel_val_all: value of RBF kernels for each point of each trajectory
-    # return: potential kernel centers
-    kernel_val_all[:, -1] += 10
-    idx_close = closests_dist_all < thr_dist
-    kernel_val_all_sum = torch.sum(kernel_val_all, 2)
-    idx_no_kernel = kernel_val_all_sum < thr_kernel
-    if kernel_val_all.shape[-1]>0:
-        max_ker_val, _ = torch.max(kernel_val_all, -1)
-    else:
-        max_ker_val = idx_close*0
-    idx_no_kernel = max_ker_val < thr_kernel
 
-    idx_candidates = idx_close * idx_no_kernel
-    # candidates = torch.unique(all_traj[idx_candidates], dim=0)
-    candidates = all_traj[idx_candidates]
-    return candidates
+# def check_traj_for_kernels(all_traj, closests_dist_all, kernel_val_all, thr_dist, thr_kernel):
+#     # Check if a trajectory has encountered an obstacle
+#     # If yes, output this position as potential kernel center
+#     # all_traj: all trajectories
+#     # closests_dist_all: distance to closest obstacle for each point of each trajectory
+#     # kernel_val_all: value of RBF kernels for each point of each trajectory
+#     # return: potential kernel centers
+#     kernel_val_all[:, -1] += 10
+#     idx_close = closests_dist_all < thr_dist
+#     kernel_val_all_sum = torch.sum(kernel_val_all, 2)
+#     idx_no_kernel = kernel_val_all_sum < thr_kernel
+#     if kernel_val_all.shape[-1]>0:
+#         max_ker_val, _ = torch.max(kernel_val_all, -1)
+#     else:
+#         max_ker_val = idx_close*0
+#     idx_no_kernel = max_ker_val < thr_kernel
+#
+#     idx_candidates = idx_close * idx_no_kernel
+#     # candidates = torch.unique(all_traj[idx_candidates], dim=0)
+#     candidates = all_traj[idx_candidates]
+#     return candidates
 
 
 if __name__ == '__main__':

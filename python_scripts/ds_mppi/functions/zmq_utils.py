@@ -6,6 +6,7 @@ def zmq_init_recv(socket):
     while val is None:
         try:
             val = socket.recv_pyobj(flags=zmq.DONTWAIT)
+            status = 1
         except:
             print('No input data! (yet) waiting...')
             time.sleep(0.1)
@@ -14,11 +15,13 @@ def zmq_init_recv(socket):
 
 
 def zmq_try_recv(val, socket):
+    status = 0
     try:
         val = socket.recv_pyobj(flags=zmq.DONTWAIT)
+        status = 1
     except:
         pass
-    return val
+    return val, status
 
 def init_subscriber(context, address, port):
     # socket to receive stuff

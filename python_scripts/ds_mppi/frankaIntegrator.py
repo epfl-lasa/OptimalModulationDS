@@ -1,5 +1,5 @@
 import sys
-sys.path.append('/functions/')
+sys.path.append('functions/')
 from MPPI import *
 import torch
 from zmq_utils import *
@@ -70,27 +70,29 @@ def main_loop():
 
     #set up one-step one-trajectory mppi to move the robot
     mppi_step = MPPI(q_0, q_f, dh_params, obs, dt_sim, dt_H, N_traj, A, dh_a, nn_model)
-    mppi_step.dst_thr = config['planner']['collision_threshold']   # subtracted from actual distance (added threshsold)
+    mppi_step.dst_thr = config['integrator']['collision_threshold']   # subtracted from actual distance (added threshsold)
     mppi_step.Policy.alpha_s *= 0
 
 
     ########################################
     ###     RUN MPPI AND SIMULATE        ###
     ########################################
-
+    for i in range(20):
+        socket_send_state.send_pyobj(q_0)
+        time.sleep(0.1)
     print('Init time: %4.2fs' % (time.time() - t00))
-
+    des_freq = config['integrator']['desired_frequency']
     t0 = time.time()
     all_fk_kernel = []
     while torch.norm(mppi_step.q_cur - q_f)+1 > 0.001:
         t_iter_start = time.time()
 
         # [ZMQ] Receive policy from planner
-        policy_data = zmq_try_recv(policy_data, socket_receive_policy)
+        policy_data, policy_recv_status = zmq_try_recv(policy_data, socket_receive_policy)
         mppi_step.Policy.update_with_data(policy_data)
 
         # [ZMQ] Receive obstacles
-        mppi_step.obs = zmq_try_recv(mppi_step.obs, socket_receive_obs)
+        mppi_step.obs, obs_recv_status = zmq_try_recv(mppi_step.obs, socket_receive_obs)
 
         # # calculate FK for all kernels
         # if len(all_fk_kernel) != mppi_step.Policy.n_kernels:
@@ -121,7 +123,7 @@ def main_loop():
         # print(q_cur)
 
         t_iter_tmp = time.time() - t_iter_start
-        time.sleep(max(0.0, 1/config['integrator']['desired_frequency'] - t_iter_tmp))
+        time.sleep(max(0.0, 1/des_freq - t_iter_tmp))
         t_iter = time.time() - t_iter_start
         print(f'Iteration:{N_ITER:4d}, Time:{t_iter:4.2f}, Frequency:{1/t_iter:4.2f},',
               f' Avg. frequency:{N_ITER/(time.time()-t0):4.2f}',

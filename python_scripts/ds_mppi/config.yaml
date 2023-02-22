@@ -3,9 +3,10 @@ collision_model:
 
 general:
   # Initial state
-  q_0: [-1.2, -0.08, 0, -2.5, -0.16,  1.6, -0.75]
-  q_f: [1.2, -0.08, 0, -2.5, -0.16,  1.6, -0.75]
-
+  #q_0: [-1.2, -0.08, 0, -2.5, -0.16,  1.6, -0.75]
+  #q_f: [1.2, -0.08, 0, -2.5, -0.16,  1.6, -0.75]
+  q_0: [-1.45, 1.16, 1.12, -1.35, 0.30, 1.87, 0]
+  q_f: [1.45, 1.16, -1.12,  -1.35, 0.3, 1.87, 0]
 zmq:
   # ZMQ params
   state_port: 1337
@@ -17,23 +18,24 @@ planner:
   n_trajectories: 100
   horizon: 5
   dt: 1
-  collision_threshold: 0.03
+  collision_threshold: 0.01
 
   # navigation kernel params
   kernel_width: 1
-  alpha_sampling_sigma: 0.3
-  policy_update_rate: 0.5
-  kernel_update_threshold: 0.001
+  alpha_sampling_sigma: 2
+  policy_update_rate: 0.1
+  kernel_update_threshold: 10.1
 
   # navigation kernel adding params
-  kernel_adding_collision_thr: 0.05
-  kernel_adding_kernels_thr: 0.05
+  kernel_adding_collision_thr: 0.03
+  kernel_adding_kernels_thr: 0.02 #(rbf value)
+  kernel_adding_l1_thr: 0.1 #(l1 value)
 
 integrator:
   n_trajectories: 1
   horizon: 2
-  dt: 0.03
-  collision_threshold: 0.00
+  dt: 0.01
+  collision_threshold: 0.01
   desired_frequency: 100
 
 simulator:
