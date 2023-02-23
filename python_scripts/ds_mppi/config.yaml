@@ -16,19 +16,20 @@ zmq:
 planner:
   # sampling params
   n_trajectories: 100
-  horizon: 5
-  dt: 1
+  horizon: 10
+  dt: 0.3
   collision_threshold: 0.02
 
   # navigation kernel params
   kernel_width: 1
-  alpha_sampling_sigma: 1
+  kernel_p: 2
+  alpha_sampling_sigma: 2
   policy_update_rate: 0.5
   kernel_update_threshold: 0.002  #kernels with mean activation below this value are not updated
 
   # navigation kernel adding params
   kernel_adding_collision_thr: 0.1
-  kernel_adding_kernels_thr: 0.01 #(rbf value, lower it is - sparser the kernels - depends on kernel_width a lot)
+  kernel_adding_kernels_thr: 0.03 #(rbf value, lower it is - sparser the kernels - depends on kernel_width a lot)
 
 integrator:
   n_trajectories: 1

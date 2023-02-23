@@ -73,7 +73,6 @@ def main_loop():
     mppi_step.dst_thr = config['integrator']['collision_threshold']   # subtracted from actual distance (added threshsold)
     mppi_step.Policy.alpha_s *= 0
 
-
     ########################################
     ###     RUN MPPI AND SIMULATE        ###
     ########################################
@@ -127,7 +126,8 @@ def main_loop():
         print(f'Iteration:{N_ITER:4d}, Time:{t_iter:4.2f}, Frequency:{1/t_iter:4.2f},',
               f' Avg. frequency:{N_ITER/(time.time()-t0):4.2f}',
               f' Kernel count:{mppi_step.Policy.n_kernels:4d}',
-              f'Distance to collision: {mppi_step.closest_dist_all[0,0]*100:4.2f}cm')
+              f'Distance to collision: {mppi_step.closest_dist_all[0,0]*100:4.2f}cm',
+              f'Kernel weights: {mppi_step.ker_w}')
         #print('Position difference: %4.3f'% (mppi_step.q_cur - q_f).norm().cpu())
     td = time.time() - t0
     print('Time: ', td)

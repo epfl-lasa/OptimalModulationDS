@@ -34,7 +34,7 @@ class TensorPolicyMPPI:
         # kernel obstacle parameters
         self.kernel_gammas = torch.zeros(self.N_KERNEL_MAX, **self.params)
         self.kernel_obstacle_bases = torch.zeros((self.N_KERNEL_MAX, self.n_dof, self.n_dof), **self.params)
-
+        self.p = 2  # RBF kernel power
     def reset_policy(self):
         # Reset policy parameters
         self.n_kernels = 0
@@ -57,13 +57,16 @@ class TensorPolicyMPPI:
         # self.alpha_tmp[:, :self.n_kernels] = torch.randn((self.n_traj, self.n_kernels, self.n_dof - 1),
         #                                                  **self.params) * self.alpha_s + self.alpha_c[:self.n_kernels]
         # GPU sampling
+        self.mu_tmp *= 0
+        self.sigma_tmp *= 0
+        self.alpha_tmp *= 0
         self.mu_tmp[:, :self.n_kernels] = self.mu_tmp[:, :self.n_kernels].normal_(mean=0, std=self.mu_s) \
                                           + self.mu_c[:self.n_kernels]
         self.sigma_tmp[:, :self.n_kernels] = self.sigma_tmp[:, :self.n_kernels].normal_(mean=0, std=self.sigma_s) \
                                                 + self.sigma_c[:self.n_kernels]
         self.alpha_tmp[:, :self.n_kernels] = self.alpha_tmp[:, :self.n_kernels].normal_(mean=0, std=self.alpha_s) \
                                                 + self.alpha_c[:self.n_kernels]
-        # self.alpha_tmp[:, :self.n_kernels, 0] = 0 ## important to nullify the first component of alpha
+        self.alpha_tmp[:, :self.n_kernels, 0] = 0 ## important to nullify the first component of alpha
         # normalize alpha, as they must represent a vector
         # self.alpha_tmp[:, :self.n_kernels] = self.alpha_tmp[:, :self.n_kernels] / \
         #                                     torch.norm(self.alpha_tmp[:, :self.n_kernels], dim=2, keepdim=True)
@@ -144,7 +147,7 @@ class TensorPolicyMPPI:
         close_candidates = all_traj[idx_close].view(-1, self.n_dof)
         # then check if any of these points is far from a kernel
         if self.n_kernels > 0:
-            rbf_val_candidates = eval_rbf_simple(close_candidates, self.mu_c[0:self.n_kernels], self.sigma_c[0:self.n_kernels])
+            rbf_val_candidates = eval_rbf_simple(close_candidates, self.mu_c[0:self.n_kernels], self.sigma_c[0:self.n_kernels], self.p)
             rbf_val_closest = torch.max(rbf_val_candidates, -1)[0]
             idx_no_kernel = (rbf_val_closest < thr_kernel)
             # diff_ker_centers = all_traj.view(-1, self.n_dof) - self.mu_c[0:self.n_kernels].unsqueeze(1)
@@ -167,13 +170,14 @@ def eval_policy(rbf_val: torch.Tensor,
 
 def eval_rbf(q: torch.Tensor,
              mu: torch.Tensor,
-             sigma: torch.Tensor):
+             sigma: torch.Tensor,
+             p=2):
     # Evaluate policy at q
     # mu: centers of RBF kernels
     # sigma: standard deviations of RBF kernels
     # q: state
     # return: perturbation along tangent directions
-    numerator = torch.norm(q[:, None, :] - mu, 2, 2, keepdim=True) ** 2
+    numerator = torch.norm(q[:, None, :] - mu, p=p, dim=2, keepdim=True) ** 2
     # denominator = 2 * sigma.unsqueeze(2) ** 2
     # exp_term = torch.exp(-numerator / denominator)
     exp_term = torch.exp(-sigma.unsqueeze(2) * numerator)
@@ -181,13 +185,14 @@ def eval_rbf(q: torch.Tensor,
 
 def eval_rbf_simple(q: torch.Tensor,
              mu: torch.Tensor,
-             sigma: torch.Tensor):
+             sigma: torch.Tensor,
+             p=2):
     # Evaluate policy at q
     # mu: centers of RBF kernels
     # sigma: standard deviations of RBF kernels
     # q: state
     # return: rbf value
-    numerator = torch.norm(q[:, None, :] - mu, 2, -1) ** 2
+    numerator = torch.norm(q[:, None, :] - mu, p, -1) ** 2
     # denominator = 2 * sigma ** 2
     # exp_term = torch.exp(-numerator / denominator)
     exp_term = torch.exp(-sigma * numerator)

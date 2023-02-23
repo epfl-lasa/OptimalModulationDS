@@ -78,7 +78,7 @@ class MPPI:
                 nominal_velocity = (q_prev - self.qf) @ self.A
             # apply policies
             with record_function("TAG: Apply policies"):
-                kernel_value = eval_rbf(q_prev, P.mu_tmp[:, 0:P.n_kernels], P.sigma_tmp[:, 0:P.n_kernels])
+                kernel_value = eval_rbf(q_prev, P.mu_tmp[:, 0:P.n_kernels], P.sigma_tmp[:, 0:P.n_kernels], P.p)
                 # kernel_value[kernel_value < self.ker_thr] = 0
                 # ker_w = torch.exp(50*kernel_value)
                 # ker_w[kernel_value < self.ker_thr] = 0
@@ -89,7 +89,11 @@ class MPPI:
                 #policy_all_flows = P.alpha_tmp[:, 0:P.n_kernels]
                 # that's for kernel gamma(q_k) policy
                 policy_all_flows = (P.kernel_obstacle_bases[0:P.n_kernels] @ P.alpha_tmp[:, 0:P.n_kernels].unsqueeze(3)).squeeze()
-                policy_value = torch.sum(policy_all_flows * self.ker_w, 1)
+                #dirty workaround for broadcasting quirk
+                if P.n_kernels == 1:
+                    policy_value = (policy_all_flows * self.ker_w)[0]
+                else:
+                    policy_value = torch.sum(policy_all_flows * self.ker_w, 1)
 
                 if P.n_kernels > 0:
                     self.kernel_val_all[:, i - 1, 0:P.n_kernels] = kernel_value.reshape((self.N_traj, P.n_kernels))
@@ -130,7 +134,7 @@ class MPPI:
                     k_sigmoid = 100
 
                 ln_min, ln_max = 0, 1
-                ltau_min, ltau_max = 1, 3
+                ltau_min, ltau_max = 1, 10
                 l_n = generalized_sigmoid(distance, ln_min, ln_max, dist_low, dist_high, k_sigmoid)
                 l_tau = generalized_sigmoid(distance, ltau_max, ltau_min, dist_low, dist_high, k_sigmoid)
                 # self.D = self.D * 0 + torch.eye(self.n_dof).to(**self.tensor_args)
