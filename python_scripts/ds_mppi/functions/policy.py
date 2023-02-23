@@ -31,12 +31,18 @@ class TensorPolicyMPPI:
         self.sigma_tmp = torch.zeros((self.n_traj, self.N_KERNEL_MAX), **self.params)
         self.alpha_tmp = torch.zeros((self.n_traj, self.N_KERNEL_MAX, self.n_dof), **self.params)
 
+        # kernel obstacle parameters
+        self.kernel_gammas = torch.zeros(self.N_KERNEL_MAX, **self.params)
+        self.kernel_obstacle_bases = torch.zeros((self.N_KERNEL_MAX, self.n_dof, self.n_dof), **self.params)
+
     def reset_policy(self):
         # Reset policy parameters
         self.n_kernels = 0
         self.mu_c *= 0
         self.sigma_c *= 0
         self.alpha_c *= 0
+        self.kernel_gammas *= 0
+        self.kernel_obstacle_bases *= 0
 
     def sample_policy(self):
         # Sample centers
@@ -91,16 +97,19 @@ class TensorPolicyMPPI:
 
     def update_with_data(self, data):
         if data is not None:
-            self.n_kernels = data[0]
-            self.mu_c[0:self.n_kernels] = data[1]
-            self.alpha_c[0:self.n_kernels] = data[2]
-            self.sigma_c[0:self.n_kernels] = data[3]
+            self.n_kernels = data['n_kernels']
+            self.mu_c[0:self.n_kernels] = data['mu_c']
+            self.alpha_c[0:self.n_kernels] = data['alpha_c']
+            self.sigma_c[0:self.n_kernels] = data['sigma_c']
+            self.kernel_obstacle_bases[0:self.n_kernels] = data['norm_basis']
             self.mu_c[self.n_kernels:] *= 0
             self.alpha_c[self.n_kernels:] *= 0
             self.sigma_c[self.n_kernels:] *= 0
+            self.kernel_obstacle_bases[self.n_kernels:] *= 0
         else:
             pass
-    def add_kernel(self, q):
+
+    def add_kernel(self, q, kernel_gamma, kernel_obstacle_basis):
         # Add a new kernel centered at q
         if self.n_kernels < self.N_KERNEL_MAX:
             # new center as specified
@@ -113,8 +122,14 @@ class TensorPolicyMPPI:
                 self.alpha_c[self.n_kernels, :] = self.alpha_c[idx, :]
             else:
                 self.alpha_c[self.n_kernels, :] = 0
+
+            #add obstacle-related properties
+            self.kernel_gammas[self.n_kernels] = kernel_gamma
+            self.kernel_obstacle_bases[self.n_kernels] = kernel_obstacle_basis
+
             # increment number of kernels
             self.n_kernels += 1
+
         else:
             print('Not adding new kernel at: maximum number of kernels reached', q)
 

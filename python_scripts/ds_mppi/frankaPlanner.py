@@ -89,10 +89,10 @@ def main_loop():
         t_iter = time.time()
         # [ZMQ] Receive state from integrator
         mppi.q_cur, state_recv_status = zmq_try_recv(mppi.q_cur, socket_receive_state)
-        # if state_recv_status and (mppi.q_cur - q_0).norm().numpy() < 1e-6:
-        #     print('Resetting policy')
-        #     mppi.Policy.reset_policy()
-        #     all_kernel_fk = []
+        if state_recv_status and (mppi.q_cur - q_0).norm().numpy() < 1e-6:
+            print('Resetting policy')
+            mppi.Policy.reset_policy()
+            all_kernel_fk = []
 
         # [ZMQ] Receive obstacles
         mppi.obs, obs_recv_status = zmq_try_recv(mppi.obs, socket_receive_obs)
@@ -121,16 +121,22 @@ def main_loop():
                 idx_to_add = closest_idx
             else:
                 idx_to_add = rand_idx
-            mppi.Policy.add_kernel(kernel_candidates[idx_to_add])
+            candidate = kernel_candidates[idx_to_add]
+            # some mess to store the obstacle basis
+            idx_i, idx_h = torch.where((all_traj == candidate).all(dim=-1))
+            idx_i, idx_h = idx_i[0], idx_h[0]
+            # add the kernel finally
+            mppi.Policy.add_kernel(kernel_candidates[idx_to_add], closests_dist_all[idx_i, idx_h], mppi.norm_basis[idx_i, idx_h].squeeze())
             kernel_fk, _ = numeric_fk_model(kernel_candidates[idx_to_add], dh_params, 2)
             all_kernel_fk.append(kernel_fk[1:].flatten(0, 1))
 
         # [ZMQ] Send current policy to integrator
-        data = [mppi.Policy.n_kernels,
-                mppi.Policy.mu_c[0:mppi.Policy.n_kernels],
-                mppi.Policy.alpha_c[0:mppi.Policy.n_kernels],
-                mppi.Policy.sigma_c[0:mppi.Policy.n_kernels],
-                all_kernel_fk]
+        data = {'n_kernels': mppi.Policy.n_kernels,
+                'mu_c': mppi.Policy.mu_c[0:mppi.Policy.n_kernels],
+                'alpha_c': mppi.Policy.alpha_c[0:mppi.Policy.n_kernels],
+                'sigma_c': mppi.Policy.sigma_c[0:mppi.Policy.n_kernels],
+                'norm_basis': mppi.Policy.kernel_obstacle_bases[0:mppi.Policy.n_kernels],
+                'kernel_fk': all_kernel_fk}
 
         socket_send_policy.send_pyobj(data)
 

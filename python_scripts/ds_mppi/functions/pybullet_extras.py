@@ -71,7 +71,7 @@ class KernelManager:
 
     def update_kernels(self, policy_data):
         if policy_data is not None:
-            kernel_array = policy_data[-1]
+            kernel_array = policy_data['kernel_fk']
             if len(self.kernels) < len(kernel_array):
                 for i in range(len(self.kernels), len(kernel_array)):
                     self.create_line(kernel_array[i])

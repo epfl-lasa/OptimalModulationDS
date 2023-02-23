@@ -16,8 +16,8 @@ zmq:
 planner:
   # sampling params
   n_trajectories: 100
-  horizon: 20
-  dt: 0.2
+  horizon: 5
+  dt: 1
   collision_threshold: 0.02
 
   # navigation kernel params
@@ -28,7 +28,7 @@ planner:
 
   # navigation kernel adding params
   kernel_adding_collision_thr: 0.1
-  kernel_adding_kernels_thr: 0.05 #(rbf value, lower it is - sparser the kernels - depends on kernel_width a lot)
+  kernel_adding_kernels_thr: 0.01 #(rbf value, lower it is - sparser the kernels - depends on kernel_width a lot)
 
 integrator:
   n_trajectories: 1

@@ -42,7 +42,7 @@ class MPPI:
         self.nn_input = torch.zeros(N_traj * obs.shape[0], self.n_dof + 3).to(**self.tensor_args)
         self.D = (torch.zeros([self.N_traj, self.n_dof, self.n_dof]) + torch.eye(self.n_dof)).to(**self.tensor_args)
         self.nn_grad = torch.zeros(N_traj, self.n_dof).to(**self.tensor_args)
-        self.norm_basis = torch.zeros((self.N_traj, self.n_dof, self.n_dof)).to(**self.tensor_args)
+        self.norm_basis = torch.zeros((self.N_traj, dt_H, self.n_dof, self.n_dof)).to(**self.tensor_args)
         self.basis_eye = torch.eye(self.n_dof).repeat(N_traj, 1).reshape(N_traj, self.n_dof, self.n_dof).to(**self.tensor_args).cpu()
         self.basis_eye_temp = (self.basis_eye * 0).to(**self.tensor_args).cpu()
         self.nn_model.allocate_gradients(self.N_traj, self.tensor_args)
@@ -84,7 +84,13 @@ class MPPI:
                 # ker_w[kernel_value < self.ker_thr] = 0
                 # self.ker_w = torch.nan_to_num(ker_w / torch.sum(ker_w, 1).unsqueeze(1)) #normalize kernel influence
                 self.ker_w = kernel_value
-                policy_value = torch.sum(P.alpha_tmp[:, 0:P.n_kernels] * self.ker_w, 1)
+                P.alpha_tmp[:, 0:P.n_kernels, 0] = 0
+                # that's for local gamma(q) policy
+                #policy_all_flows = P.alpha_tmp[:, 0:P.n_kernels]
+                # that's for kernel gamma(q_k) policy
+                policy_all_flows = (P.kernel_obstacle_bases[0:P.n_kernels] @ P.alpha_tmp[:, 0:P.n_kernels].unsqueeze(3)).squeeze()
+                policy_value = torch.sum(policy_all_flows * self.ker_w, 1)
+
                 if P.n_kernels > 0:
                     self.kernel_val_all[:, i - 1, 0:P.n_kernels] = kernel_value.reshape((self.N_traj, P.n_kernels))
             #distance calculation (NN)
@@ -104,6 +110,7 @@ class MPPI:
                 E, R = torch.linalg.qr(self.basis_eye_temp)
                 E = E.to(**self.tensor_args)
                 E[:, :, 0] = self.nn_grad / self.nn_grad.norm(2, 1).unsqueeze(1)
+                self.norm_basis[:, i-1] = E
             with record_function("TAG: Modulation-propagation"):
                 # calculate standard modulation coefficients
                 # gamma = distance + 1
@@ -119,8 +126,8 @@ class MPPI:
                     k_sigmoid = 3
                 else:
                     # for franka robot (meters)
-                    dist_low, dist_high = 0.03, 0.1
-                    k_sigmoid = 200
+                    dist_low, dist_high = 0.01, 0.1
+                    k_sigmoid = 100
 
                 ln_min, ln_max = 0, 1
                 ltau_min, ltau_max = 1, 3
@@ -134,20 +141,16 @@ class MPPI:
                 M = E @ self.D @ E.transpose(1, 2)
             with record_function("TAG: Apply policy"):
                 # policy control
-                # policy_value[abs(policy_value) < 1e-4] = 0  # to normalize without errors
-                # policy_value = torch.nan_to_num(policy_value / torch.norm(policy_value, 2, 1).unsqueeze(1))
-                # policy_value = torch.nan_to_num(policy_value / torch.sum(policy_value, 1).unsqueeze(1))
-                # policy_velocity = (E[:, :, 1:] @ policy_value.unsqueeze(2)).squeeze(2) #6d version
-                policy_velocity = (E @ policy_value.unsqueeze(2)).squeeze(2)
-
-                # dirty hack to ignore tangents completely, i.e. kernel equals 7d flow, not necessarily tangential to obstacles
+                ### policy depends on current Gamma(q) - logical, but suffers A LOT from oscillations
+                # policy_velocity = (E @ policy_value.unsqueeze(2)).squeeze(2)
+                ### policy depends on kernel Gamma(q_k) - assuming matrix multiplication done above
                 policy_velocity = policy_value
 
                 #policy_velocity += ((1-l_n)/100).unsqueeze(1) * E[:, :, 0]
                 # calculate modulated vector field (and normalize)
                 nominal_velocity_norm = torch.norm(nominal_velocity, dim=1).reshape(-1, 1)
                 # TODO CHECK POLICY VELOCITY NORMALIZATION (it's way less than 1)
-                policy_velocity = policy_velocity * nominal_velocity_norm             # magnitude of nominal velocity
+                # policy_velocity = policy_velocity * nominal_velocity_norm             # magnitude of nominal velocity
                 total_velocity = nominal_velocity + policy_velocity                   # magnitude of 2x nominal velocity
                 # total_velocity_norm = torch.norm(total_velocity, dim=1).unsqueeze(1)
                 # total_velocity_scaled = nominal_velocity_norm * total_velocity / total_velocity_norm

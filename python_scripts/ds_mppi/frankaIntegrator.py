@@ -105,7 +105,6 @@ def main_loop():
         # Propagate modulated DS
         mppi_step.Policy.sample_policy()    # samples a new policy using planned means and sigmas
         _, _, _ = mppi_step.propagate()
-
         # Update current robot state
         mppi_step.q_cur = mppi_step.q_cur + mppi_step.qdot[0, :] * dt_sim
         mppi_step.q_cur = torch.clamp(mppi_step.q_cur, mppi_step.Cost.q_min, mppi_step.Cost.q_max)
@@ -127,7 +126,8 @@ def main_loop():
         t_iter = time.time() - t_iter_start
         print(f'Iteration:{N_ITER:4d}, Time:{t_iter:4.2f}, Frequency:{1/t_iter:4.2f},',
               f' Avg. frequency:{N_ITER/(time.time()-t0):4.2f}',
-              f' Kernel count:{mppi_step.Policy.n_kernels:4d}')
+              f' Kernel count:{mppi_step.Policy.n_kernels:4d}',
+              f'Distance to collision: {mppi_step.closest_dist_all[0,0]*100:4.2f}cm')
         #print('Position difference: %4.3f'% (mppi_step.q_cur - q_f).norm().cpu())
     td = time.time() - t0
     print('Time: ', td)
