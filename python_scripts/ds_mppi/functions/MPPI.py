@@ -123,7 +123,7 @@ class MPPI:
                     k_sigmoid = 300
 
                 ln_min, ln_max = 0, 1
-                ltau_min, ltau_max = 1, 3
+                ltau_min, ltau_max = 1, 2
                 l_n = generalized_sigmoid(distance, ln_min, ln_max, dist_low, dist_high, k_sigmoid)
                 l_tau = generalized_sigmoid(distance, ltau_max, ltau_min, dist_low, dist_high, k_sigmoid)
                 # self.D = self.D * 0 + torch.eye(self.n_dof).to(**self.tensor_args)
@@ -144,9 +144,9 @@ class MPPI:
                 # TODO CHECK POLICY VELOCITY NORMALIZATION (it's way less than 1)
                 policy_velocity = policy_velocity * nominal_velocity_norm             # magnitude of nominal velocity
                 total_velocity = nominal_velocity + policy_velocity                   # magnitude of 2x nominal velocity
-                total_velocity_norm = torch.norm(total_velocity, dim=1).unsqueeze(1)
-                total_velocity_scaled = nominal_velocity_norm * total_velocity / total_velocity_norm
-                mod_velocity = (M @ (total_velocity_scaled).unsqueeze(2)).squeeze()
+                # total_velocity_norm = torch.norm(total_velocity, dim=1).unsqueeze(1)
+                # total_velocity_scaled = nominal_velocity_norm * total_velocity / total_velocity_norm
+                mod_velocity = (M @ (total_velocity).unsqueeze(2)).squeeze()
                 # normalization
                 mod_velocity_norm = torch.norm(mod_velocity, dim=-1).reshape(-1, 1)
                 mod_velocity_norm[mod_velocity_norm <= 0.5] = 1
@@ -230,8 +230,10 @@ class MPPI:
         beta = self.cur_cost.mean() / 50
         w = torch.exp(-1 / beta * self.cur_cost)
         w = w / w.sum()
-        noupd_mask = self.kernel_val_all[:, :, 0:self.Policy.n_kernels].sum(1).mean(0) < self.ker_thr
-        self.Policy.update_policy(w, self.policy_upd_rate, noupd_mask)
+        max_kernel_activation_each = self.kernel_val_all[:, :, 0:self.Policy.n_kernels].max(dim=1)[0]
+        mean_kernel_activation_all = max_kernel_activation_each.mean(dim=0)
+        update_mask = mean_kernel_activation_all > self.ker_thr
+        self.Policy.update_policy(w, self.policy_upd_rate, update_mask)
         return 0
 
     def update_obstacles(self, obs):

@@ -61,7 +61,7 @@ class TensorPolicyMPPI:
         self.alpha_tmp[:, :self.n_kernels] = self.alpha_tmp[:, :self.n_kernels] / \
                                             torch.norm(self.alpha_tmp[:, :self.n_kernels], dim=2, keepdim=True)
         self.alpha_tmp[:, :self.n_kernels] = torch.nan_to_num(self.alpha_tmp[:, :self.n_kernels])
-    def update_policy(self, w, upd_rate, noupd_mask=None):
+    def update_policy(self, w, upd_rate, update_mask=None):
         # Update policy parameters, use current state(mu_c, sigma_c and alpha_c)
         # and a sampled policy (mu_tmp, sigma_tmp, alpha_tmp) with weights w
         mu_cur_sum = torch.sum(w[:, None, None] * self.mu_tmp[:, :self.n_kernels], 0)
@@ -71,8 +71,8 @@ class TensorPolicyMPPI:
         if self.n_kernels > 0:
             # prepare upd rate tensor
             upd_tens = upd_rate*torch.ones(self.n_kernels, **self.params)
-            if noupd_mask is not None:
-                upd_tens[noupd_mask] = 0.0
+            if update_mask is not None:
+                upd_tens[~update_mask] = 0.0  # we update kernels marked as True in update_mask
             # Update centers
             # scalar upd_rate
             # self.mu_c[0:self.n_kernels] = (1 - upd_rate) * self.mu_c[0:self.n_kernels] + upd_rate * mu_cur_sum
@@ -158,8 +158,9 @@ def eval_rbf(q: torch.Tensor,
     # q: state
     # return: perturbation along tangent directions
     numerator = torch.norm(q[:, None, :] - mu, 2, 2, keepdim=True) ** 2
-    denominator = 2 * sigma.unsqueeze(2) ** 2
-    exp_term = torch.exp(-numerator / denominator)
+    # denominator = 2 * sigma.unsqueeze(2) ** 2
+    # exp_term = torch.exp(-numerator / denominator)
+    exp_term = torch.exp(-sigma.unsqueeze(2) * numerator)
     return exp_term
 
 def eval_rbf_simple(q: torch.Tensor,
@@ -171,8 +172,9 @@ def eval_rbf_simple(q: torch.Tensor,
     # q: state
     # return: rbf value
     numerator = torch.norm(q[:, None, :] - mu, 2, -1) ** 2
-    denominator = 2 * sigma ** 2
-    exp_term = torch.exp(-numerator / denominator)
+    # denominator = 2 * sigma ** 2
+    # exp_term = torch.exp(-numerator / denominator)
+    exp_term = torch.exp(-sigma * numerator)
     return exp_term
 
 

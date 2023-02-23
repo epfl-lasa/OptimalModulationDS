@@ -35,7 +35,6 @@ def main_loop():
     ########################################
     t00 = time.time()
     DOF = 7
-    L = 1
 
     # Load nn model
     fname = config["collision_model"]["fname"]
@@ -115,8 +114,11 @@ def main_loop():
 
         if len(kernel_candidates) > 0:
             rand_idx = torch.randint(kernel_candidates.shape[0], (1,))[0]
-            closest_idx = torch.norm(kernel_candidates - mppi.q_cur, 2, -1).argmin()
-            idx_to_add = closest_idx
+            closest_candidate_norm, closest_idx = torch.norm(kernel_candidates - mppi.q_cur, 2, -1).min(dim=0)
+            if closest_candidate_norm < 1e-1:
+                idx_to_add = closest_idx
+            else:
+                idx_to_add = rand_idx
             mppi.Policy.add_kernel(kernel_candidates[idx_to_add])
             kernel_fk, _ = numeric_fk_model(kernel_candidates[idx_to_add], dh_params, 2)
             all_kernel_fk.append(kernel_fk[1:].flatten(0, 1))
