@@ -11,10 +11,10 @@ class Cost:
         self.q_max = torch.tensor([2.8973, 1.7628, 2.8973, -0.0698, 2.8973, 3.7525, 2.8973])
 
     def evaluate_costs(self, all_traj, closest_dist_all):
-        goal_cost = self.goal_cost(all_traj[:, -1, :], self.qf)
-        collision_cost = self.collision_cost(closest_dist_all)
+        goal_cost = 100*self.goal_cost(all_traj[:, -1, :], self.qf)
+        collision_cost = 100*self.collision_cost(closest_dist_all)
         joint_limits_cost = self.joint_limits_cost(all_traj)
-        stagnation_cost = 100*goal_cost * self.stagnation_cost(all_traj)
+        stagnation_cost = goal_cost * self.stagnation_cost(all_traj)
 
         fk_cost = 10*self.fk_cost(all_traj[:, -1, :])
 
@@ -22,7 +22,7 @@ class Cost:
         return total_cost
 
     def goal_cost(self, traj_end, qf):
-        return (traj_end - qf).norm(0.5, dim=1)
+        return (traj_end - qf).norm(p=2, dim=1)
 
     def fk_cost(self, traj_end):
         traj_end_fk = numeric_fk_model_vec(traj_end, self.dh_params, 2)[0]
@@ -34,7 +34,7 @@ class Cost:
         return (closest_dist_all < 0).sum(dim=1)
 
     def joint_limits_cost(self, all_traj):
-        mask = (all_traj < -3.1415).sum(dim=1) + (all_traj > 3.1415).sum(dim=1)
+        mask = (all_traj < self.q_min).sum(dim=1) + (all_traj > self.q_max).sum(dim=1)
         mask = mask.sum(dim=1)
         return (mask > 0) + 0
 

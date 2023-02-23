@@ -56,7 +56,7 @@ q_rand = q_0 + (2*torch.rand(n_rand, 7)-1) * rand_scale
 
 plotting = True
 for p in [2]:
-    for sigma in [3]:
+    for sigma in [0.5]:
         #rbf values
         rbf_val = rbf_kernel(q_0, q_rand, sigma, p)
         rbf_val_sorted, sorted_idx = rbf_val.sort()

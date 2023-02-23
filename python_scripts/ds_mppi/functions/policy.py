@@ -20,7 +20,7 @@ class TensorPolicyMPPI:
         # Policy centers
         self.mu_c = torch.zeros((self.N_KERNEL_MAX, self.n_dof), **self.params)  # Centers of RBF kernels
         self.sigma_c = torch.zeros((self.N_KERNEL_MAX), **self.params)  # Standard deviations of RBF kernels
-        self.alpha_c = torch.zeros((self.N_KERNEL_MAX, self.n_dof - 1),
+        self.alpha_c = torch.zeros((self.N_KERNEL_MAX, self.n_dof),
                                    **self.params)  # Weights of RBF kernels for each tangential direction
         # Policy sigmas
         self.mu_s = torch.tensor(0, **self.params)
@@ -29,7 +29,7 @@ class TensorPolicyMPPI:
         # sampled policy
         self.mu_tmp = torch.zeros((self.n_traj, self.N_KERNEL_MAX, self.n_dof), **self.params)
         self.sigma_tmp = torch.zeros((self.n_traj, self.N_KERNEL_MAX), **self.params)
-        self.alpha_tmp = torch.zeros((self.n_traj, self.N_KERNEL_MAX, self.n_dof - 1), **self.params)
+        self.alpha_tmp = torch.zeros((self.n_traj, self.N_KERNEL_MAX, self.n_dof), **self.params)
 
     def reset_policy(self):
         # Reset policy parameters
@@ -57,10 +57,11 @@ class TensorPolicyMPPI:
                                                 + self.sigma_c[:self.n_kernels]
         self.alpha_tmp[:, :self.n_kernels] = self.alpha_tmp[:, :self.n_kernels].normal_(mean=0, std=self.alpha_s) \
                                                 + self.alpha_c[:self.n_kernels]
-        # # normalize alpha, as they must represent a vector
-        self.alpha_tmp[:, :self.n_kernels] = self.alpha_tmp[:, :self.n_kernels] / \
-                                            torch.norm(self.alpha_tmp[:, :self.n_kernels], dim=2, keepdim=True)
-        self.alpha_tmp[:, :self.n_kernels] = torch.nan_to_num(self.alpha_tmp[:, :self.n_kernels])
+        # self.alpha_tmp[:, :self.n_kernels, 0] = 0 ## important to nullify the first component of alpha
+        # normalize alpha, as they must represent a vector
+        # self.alpha_tmp[:, :self.n_kernels] = self.alpha_tmp[:, :self.n_kernels] / \
+        #                                     torch.norm(self.alpha_tmp[:, :self.n_kernels], dim=2, keepdim=True)
+        # self.alpha_tmp[:, :self.n_kernels] = torch.nan_to_num(self.alpha_tmp[:, :self.n_kernels])
     def update_policy(self, w, upd_rate, update_mask=None):
         # Update policy parameters, use current state(mu_c, sigma_c and alpha_c)
         # and a sampled policy (mu_tmp, sigma_tmp, alpha_tmp) with weights w

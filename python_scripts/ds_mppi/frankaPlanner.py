@@ -89,10 +89,10 @@ def main_loop():
         t_iter = time.time()
         # [ZMQ] Receive state from integrator
         mppi.q_cur, state_recv_status = zmq_try_recv(mppi.q_cur, socket_receive_state)
-        if state_recv_status and (mppi.q_cur - q_0).norm().numpy() < 1e-6:
-            print('Resetting policy')
-            mppi.Policy.reset_policy()
-            all_kernel_fk = []
+        # if state_recv_status and (mppi.q_cur - q_0).norm().numpy() < 1e-6:
+        #     print('Resetting policy')
+        #     mppi.Policy.reset_policy()
+        #     all_kernel_fk = []
 
         # [ZMQ] Receive obstacles
         mppi.obs, obs_recv_status = zmq_try_recv(mppi.obs, socket_receive_obs)
@@ -107,6 +107,8 @@ def main_loop():
         with record_function("TAG: cost calculation"):
             # Calculate cost
             cost = mppi.get_cost() # don't delete, writes to self.cost
+            best_idx = torch.argmin(cost)
+            print(f'Best cost: {cost[best_idx]}')
             mppi.shift_policy_means()
 
         # Check trajectory for new kernel candidates and add policy kernels

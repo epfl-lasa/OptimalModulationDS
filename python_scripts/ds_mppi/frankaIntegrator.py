@@ -108,7 +108,7 @@ def main_loop():
 
         # Update current robot state
         mppi_step.q_cur = mppi_step.q_cur + mppi_step.qdot[0, :] * dt_sim
-
+        mppi_step.q_cur = torch.clamp(mppi_step.q_cur, mppi_step.Cost.q_min, mppi_step.Cost.q_max)
         # [ZMQ] Send current state to planner
         q_des = mppi_step.q_cur
         dq_des = mppi_step.qdot[0, :] * 0
@@ -116,7 +116,7 @@ def main_loop():
         socket_send_state.send_pyobj(q_des)
 
         N_ITER += 1
-        if torch.norm(mppi_step.q_cur - q_f) < 0.2:
+        if torch.norm(mppi_step.q_cur - q_f) < 0.1:
             mppi_step.q_cur = q_0
             socket_send_state.send_pyobj(mppi_step.q_cur)
             time.sleep(1)

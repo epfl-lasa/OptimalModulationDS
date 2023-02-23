@@ -120,10 +120,10 @@ class MPPI:
                 else:
                     # for franka robot (meters)
                     dist_low, dist_high = 0.03, 0.1
-                    k_sigmoid = 300
+                    k_sigmoid = 200
 
                 ln_min, ln_max = 0, 1
-                ltau_min, ltau_max = 1, 2
+                ltau_min, ltau_max = 1, 3
                 l_n = generalized_sigmoid(distance, ln_min, ln_max, dist_low, dist_high, k_sigmoid)
                 l_tau = generalized_sigmoid(distance, ltau_max, ltau_min, dist_low, dist_high, k_sigmoid)
                 # self.D = self.D * 0 + torch.eye(self.n_dof).to(**self.tensor_args)
@@ -137,7 +137,12 @@ class MPPI:
                 # policy_value[abs(policy_value) < 1e-4] = 0  # to normalize without errors
                 # policy_value = torch.nan_to_num(policy_value / torch.norm(policy_value, 2, 1).unsqueeze(1))
                 # policy_value = torch.nan_to_num(policy_value / torch.sum(policy_value, 1).unsqueeze(1))
-                policy_velocity = (E[:, :, 1:] @ policy_value.unsqueeze(2)).squeeze(2)
+                # policy_velocity = (E[:, :, 1:] @ policy_value.unsqueeze(2)).squeeze(2) #6d version
+                policy_velocity = (E @ policy_value.unsqueeze(2)).squeeze(2)
+
+                # dirty hack to ignore tangents completely, i.e. kernel equals 7d flow, not necessarily tangential to obstacles
+                policy_velocity = policy_value
+
                 #policy_velocity += ((1-l_n)/100).unsqueeze(1) * E[:, :, 0]
                 # calculate modulated vector field (and normalize)
                 nominal_velocity_norm = torch.norm(nominal_velocity, dim=1).reshape(-1, 1)
@@ -147,12 +152,12 @@ class MPPI:
                 # total_velocity_norm = torch.norm(total_velocity, dim=1).unsqueeze(1)
                 # total_velocity_scaled = nominal_velocity_norm * total_velocity / total_velocity_norm
                 mod_velocity = (M @ (total_velocity).unsqueeze(2)).squeeze()
-                # normalization
+                # # normalization
                 mod_velocity_norm = torch.norm(mod_velocity, dim=-1).reshape(-1, 1)
                 mod_velocity_norm[mod_velocity_norm <= 0.5] = 1
                 mod_velocity = torch.nan_to_num(mod_velocity / mod_velocity_norm)
                 # slow down and repulsion for collision case
-                #mod_velocity[distance < 0] *= 0.01
+                mod_velocity[distance < 0] *= 0.1
                 repulsion_velocity = E[:, :, 0] * nominal_velocity_norm
                 mod_velocity[distance < 0] += repulsion_velocity[distance < 0]
             with record_function("TAG: Propagate"):
@@ -233,6 +238,7 @@ class MPPI:
         max_kernel_activation_each = self.kernel_val_all[:, :, 0:self.Policy.n_kernels].max(dim=1)[0]
         mean_kernel_activation_all = max_kernel_activation_each.mean(dim=0)
         update_mask = mean_kernel_activation_all > self.ker_thr
+        print(f'Updating {sum(update_mask)} kernels!')
         self.Policy.update_policy(w, self.policy_upd_rate, update_mask)
         return 0
 
