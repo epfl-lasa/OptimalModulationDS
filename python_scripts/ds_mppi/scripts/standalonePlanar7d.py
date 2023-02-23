@@ -99,8 +99,8 @@ def main_int():
     mppi_step.Policy.alpha_s *= 0
 
     # jit warmup
-    for i in range(20):
-        _, _, _ = mppi.propagate()
+    # for i in range(20):
+    #     _, _, _ = mppi.propagate()
 
     #     _ = mppi.nn_model.model_jit.forward(torch.randn(N_traj*obs.shape[0], 10).to(**params))
     #     _ = mppi.nn_model.model_jit_q.forward(torch.randn(N_traj*obs.shape[0], 10).to(**params))
