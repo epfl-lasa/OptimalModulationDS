@@ -112,9 +112,11 @@ class RobotSdfCollisionNet():
     def allocate_gradients(self, N, tensor_args):
         self.grads = torch.zeros((N, self.in_channels, 1)).to(**tensor_args)
         self.grd = torch.zeros((N, self.out_channels)).to(**tensor_args)
+        self.maxInputSize = N
 
     def dist_grad_closest(self, q):
-        minidxMask = torch.zeros(q.shape[0])
+        n_inputs = min(self.maxInputSize, q.shape[0])
+        q = q[:n_inputs]
         self.grd = self.grd * 0
         self.grads = self.grads * 0
         with torch.enable_grad():
@@ -126,13 +128,13 @@ class RobotSdfCollisionNet():
             minidxMask = torch.argmin(dist_scale, dim=1)
             #self.grd = torch.zeros((q.shape[0], self.out_channels), device = q.device, dtype = q.dtype) # same shape as preds
             #self.grads = torch.zeros((q.shape[0], q.shape[1], 1), device = q.device, dtype = q.dtype)
-            self.grd[list(range(q.shape[0])), minidxMask] = 1
-            dist_scale.backward(gradient=self.grd, retain_graph=False)
-            self.grads[:, :, 0] = q.grad  # fill in one column of Jacobian
+            self.grd[list(range(n_inputs)), minidxMask] = 1
+            dist_scale.backward(gradient=self.grd[:n_inputs], retain_graph=False)
+            self.grads[:n_inputs, :, 0] = q.grad  # fill in one column of Jacobian
             #q.grad.zero_()  # .backward() accumulates gradients, so reset to zero
             for param in self.model.parameters():
                 param.grad = None
-        return dist_scale.detach(), self.grads.detach(), minidxMask.detach()
+        return dist_scale.detach(), self.grads[:n_inputs].detach(), minidxMask.detach()
 
 
     def tmp_fcn(self, model, q):

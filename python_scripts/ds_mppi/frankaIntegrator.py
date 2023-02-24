@@ -68,7 +68,8 @@ def main_loop():
     dt_sim = config['integrator']['dt']
     N_ITER_TOTAL = 0
     N_ITER_TRAJ = 0
-
+    N_SUCCESS = 0
+    SLEEP_SUCCESS = 1
     #set up one-step one-trajectory mppi to move the robot
     mppi_step = MPPI(q_0, q_f, dh_params, obs, dt_sim, dt_H, N_traj, A, dh_a, nn_model)
     mppi_step.dst_thr = config['integrator']['collision_threshold']   # subtracted from actual distance (added threshsold)
@@ -91,8 +92,8 @@ def main_loop():
         policy_data, policy_recv_status = zmq_try_recv(policy_data, socket_receive_policy)
         mppi_step.Policy.update_with_data(policy_data)
         # [ZMQ] Receive obstacles
-        mppi_step.obs, obs_recv_status = zmq_try_recv(mppi_step.obs, socket_receive_obs)
-
+        obstacles_data, obs_recv_status = zmq_try_recv(mppi_step.obs, socket_receive_obs)
+        mppi_step.update_obstacles(obstacles_data)
         # Propagate modulated DS
         mppi_step.Policy.sample_policy()    # samples a new policy using planned means and sigmas
         _, _, _ = mppi_step.propagate()
@@ -113,6 +114,7 @@ def main_loop():
             socket_send_state.send_pyobj(mppi_step.q_cur)
             print(f'Trajectory reached in {N_ITER_TRAJ} iterations.')
             N_ITER_TRAJ = 0
+            N_SUCCESS += 1
             time.sleep(1)
         # print(q_cur)
 
@@ -121,7 +123,7 @@ def main_loop():
         t_iter = time.time() - t_iter_start
         np.set_printoptions(precision=2, suppress=True)
         print(f'Iteration: {N_ITER_TRAJ:4d}({N_ITER_TOTAL:4d} total), Time:{t_iter:4.2f}, Frequency:{1/t_iter:4.2f},',
-              f' Avg. frequency:{N_ITER_TOTAL/(time.time()-t0):4.2f}',
+              f' Avg. frequency:{N_ITER_TOTAL/(time.time()-t0-N_SUCCESS*SLEEP_SUCCESS):4.2f}',
               f' Kernel count:{mppi_step.Policy.n_kernels:4d}',
               f'Distance to collision: {mppi_step.closest_dist_all[0,0]*100:4.2f}cm',
               f'Kernel weights: {mppi_step.ker_w.numpy()}')

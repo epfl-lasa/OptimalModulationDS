@@ -46,8 +46,8 @@ def main_loop():
 
     N_ITER = 0
     freq = config["obstacle_streamer"]["frequency"]
-    amplitude_array = torch.tensor([[0, 0, 0.1, 0],
-                                    [0.1, 0, 0, 0]])
+    amplitude_array = torch.tensor([[0, 0, 0.0, 0],
+                                    [0.15, 0, 0, 0]])
     period_array = [2, 2]
     t_0 = time.time()
     while True:

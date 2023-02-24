@@ -97,7 +97,8 @@ def main_loop():
             all_kernel_fk = []
 
         # [ZMQ] Receive obstacles
-        mppi.obs, obs_recv_status = zmq_try_recv(mppi.obs, socket_receive_obs)
+        obstacles_data, obs_recv_status = zmq_try_recv(mppi.obs, socket_receive_obs)
+        mppi.update_obstacles(obstacles_data)
 
         # Sample random policies
         mppi.Policy.sample_policy()

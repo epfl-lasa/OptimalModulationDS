@@ -45,13 +45,17 @@ class MPPI:
         self.norm_basis = torch.zeros((self.N_traj, dt_H, self.n_dof, self.n_dof)).to(**self.tensor_args)
         self.basis_eye = torch.eye(self.n_dof).repeat(N_traj, 1).reshape(N_traj, self.n_dof, self.n_dof).to(**self.tensor_args).cpu()
         self.basis_eye_temp = (self.basis_eye * 0).to(**self.tensor_args).cpu()
-        self.nn_model.allocate_gradients(self.N_traj, self.tensor_args)
+        self.nn_model.allocate_gradients(self.N_traj+self.Policy.N_KERNEL_MAX, self.tensor_args)
         self.Cost = Cost(self.qf, self.dh_params)
         self.traj_range = torch.arange(self.N_traj).to(**self.tensor_args).to(torch.long)
         self.policy_upd_rate = 0.1
         self.dst_thr = 0.5
         self.qdot = torch.zeros((self.N_traj, self.n_dof)).to(**self.tensor_args)
         self.ker_thr = 1e-3
+
+        self.kernel_gammas = torch.zeros(self.Policy.N_KERNEL_MAX, **self.tensor_args)
+        self.kernel_obstacle_bases = torch.zeros((self.Policy.N_KERNEL_MAX, self.n_dof, self.n_dof), **self.tensor_args)
+
         for tmp in range(5):
             self.Policy.sample_policy()
             _, _, _ = self.propagate()
@@ -71,6 +75,8 @@ class MPPI:
         self.reset_tensors()
         self.all_traj[:, 0, :] = self.q_cur
         P = self.Policy
+        # if P.n_kernels > 0:
+        #     self.update_kernel_normal_bases()
         for i in range(1, self.dt_H):
             with record_function("TAG: Nominal vector field"):
                 q_prev = self.all_traj[:, i - 1, :]
@@ -79,12 +85,12 @@ class MPPI:
             #distance calculation (NN)
             with record_function("TAG: evaluate NN"):
                 # evaluate NN
-                distance, self.nn_grad = self.distance_repulsion_nn(q_prev)
+                distance, self.nn_grad = self.distance_repulsion_nn(q_prev, aot=True)
                 self.nn_grad = self.nn_grad[0:self.N_traj, :] #fixes issue with aot_function cache
                 #distance, self.nn_grad = self.distance_repulsion_fk(q_prev) #not implemented for Franka
 
                 distance -= self.dst_thr
-                self.closest_dist_all[:, i - 1] = distance
+                self.closest_dist_all[:, i - 1] = distance[0:self.N_traj]
 
             with record_function("TAG: QR decomposition"):
                 # calculate modulations
@@ -125,6 +131,8 @@ class MPPI:
 
             # apply policies
             with record_function("TAG: Apply policies"):
+                tmp_basis = P.kernel_obstacle_bases[0:P.n_kernels]*0 + torch.eye(self.n_dof).to(**self.tensor_args)
+                #ker_dist, ker_grad = self.distance_repulsion_nn(P.mu_c[0:P.n_kernels])
                 kernel_value = eval_rbf(q_prev, P.mu_tmp[:, 0:P.n_kernels], P.sigma_tmp[:, 0:P.n_kernels], P.p)
                 # kernel_value[kernel_value < self.ker_thr] = 0
                 # ker_w = torch.exp(50*kernel_value)
@@ -178,7 +186,10 @@ class MPPI:
         return self.all_traj, self.closest_dist_all, self.kernel_val_all[:, :, 0:P.n_kernels]
 
 
-    def distance_repulsion_nn(self, q_prev):
+    def distance_repulsion_nn(self, q_prev, aot=True):
+        n_inputs = q_prev.shape[0]
+        if n_inputs == 2:
+            time.sleep(0.1)
         with record_function("TAG: evaluate NN_1 (build input)"):
             # building input tensor for NN (N_traj * n_obs, n_dof + 3)
             nn_input = self.build_nn_input(q_prev, self.obs)
@@ -192,17 +203,19 @@ class MPPI:
             # rebuilding input tensor to only include closest obstacles
             nn_dist -= nn_input[:, -1].unsqueeze(1)  # subtract radius
             mindist, _ = nn_dist.min(1)
-            mindist, sphere_idx = mindist.reshape(self.n_obs, self.N_traj).transpose(0, 1).min(1)
-            mask_idx = self.traj_range + sphere_idx * self.N_traj
+            mindist, sphere_idx = mindist.reshape(self.n_obs, n_inputs).transpose(0, 1).min(1)
+            mask_idx = self.traj_range[:n_inputs] + sphere_idx * n_inputs
             nn_input = nn_input[mask_idx, :]
 
         with record_function("TAG: evaluate NN_4 (forward+backward pass)"):
             # forward + backward pass to get gradients for closest obstacles
             # nn_dist, nn_grad, nn_minidx = self.nn_model.compute_signed_distance_wgrad(nn_input[:, 0:-1], 'closest')
-            # nn_dist, nn_grad, nn_minidx = self.nn_model.dist_grad_closest(nn_input[:, 0:-1])
-            # self.nn_grad = nn_grad.squeeze(2)[:, 0:self.n_dof]
+            if aot:
+                nn_dist, nn_grad, nn_minidx = self.nn_model.dist_grad_closest_aot(nn_input[:, 0:-1])
+            else:
+                nn_dist, nn_grad, nn_minidx = self.nn_model.dist_grad_closest(nn_input[:, 0:-1])
+                nn_grad = nn_grad.squeeze(2)
 
-            nn_dist, nn_grad, nn_minidx = self.nn_model.dist_grad_closest_aot(nn_input[:, 0:-1])
             self.nn_grad = nn_grad[:, 0:self.n_dof]
             if self.nn_model.out_channels == 9:
                 nn_dist = nn_dist/100   # scale down to meters
@@ -210,12 +223,16 @@ class MPPI:
         with record_function("TAG: evaluate NN_5 (process outputs)"):
             # cleaning up to get distances and gradients for closest obstacles
             nn_dist -= nn_input[:, -1].unsqueeze(1)  # subtract radius and some threshold
-            nn_dist = nn_dist[self.traj_range.unsqueeze(1), nn_minidx.unsqueeze(1)]
+            nn_dist = nn_dist[self.traj_range[:n_inputs].unsqueeze(1), nn_minidx.unsqueeze(1)]
             # get gradients
 
             distance = nn_dist.squeeze(1)
         return distance, self.nn_grad
 
+    def update_kernel_normal_bases(self):
+        # calculate gamma and repulsion for kernel centers
+        dst, grad = self.distance_repulsion_nn(self.Policy.mu_c[0:self.Policy.n_kernels], aot=False)
+        return 0
     def distance_repulsion_fk(self, q_prev):
         all_links, all_int_pts = numeric_fk_model_vec(q_prev, self.dh_params, 10)
         distance, idx_obs_closest, idx_links_closest, idx_pts_closest = get_mindist(all_links, self.obs)
@@ -254,6 +271,7 @@ class MPPI:
 
     def update_obstacles(self, obs):
         self.obs = obs
+        self.n_obs = obs.shape[0]
         return 0
 
 def generalized_sigmoid(x, y_min, y_max, x0, x1, k):
