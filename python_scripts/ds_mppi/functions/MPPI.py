@@ -76,27 +76,6 @@ class MPPI:
                 q_prev = self.all_traj[:, i - 1, :]
                 # calculate nominal vector field
                 nominal_velocity = (q_prev - self.qf) @ self.A
-            # apply policies
-            with record_function("TAG: Apply policies"):
-                kernel_value = eval_rbf(q_prev, P.mu_tmp[:, 0:P.n_kernels], P.sigma_tmp[:, 0:P.n_kernels], P.p)
-                # kernel_value[kernel_value < self.ker_thr] = 0
-                # ker_w = torch.exp(50*kernel_value)
-                # ker_w[kernel_value < self.ker_thr] = 0
-                # self.ker_w = torch.nan_to_num(ker_w / torch.sum(ker_w, 1).unsqueeze(1)) #normalize kernel influence
-                self.ker_w = kernel_value
-                P.alpha_tmp[:, 0:P.n_kernels, 0] = 0
-                # that's for local gamma(q) policy
-                #policy_all_flows = P.alpha_tmp[:, 0:P.n_kernels]
-                # that's for kernel gamma(q_k) policy
-                policy_all_flows = (P.kernel_obstacle_bases[0:P.n_kernels] @ P.alpha_tmp[:, 0:P.n_kernels].unsqueeze(3)).squeeze()
-                #dirty workaround for broadcasting quirk
-                if P.n_kernels == 1:
-                    policy_value = (policy_all_flows * self.ker_w)[0]
-                else:
-                    policy_value = torch.sum(policy_all_flows * self.ker_w, 1)
-
-                if P.n_kernels > 0:
-                    self.kernel_val_all[:, i - 1, 0:P.n_kernels] = kernel_value.reshape((self.N_traj, P.n_kernels))
             #distance calculation (NN)
             with record_function("TAG: evaluate NN"):
                 # evaluate NN
@@ -143,14 +122,38 @@ class MPPI:
                 self.D[:, 0, 0] = l_n
                 # build modulation matrix
                 M = E @ self.D @ E.transpose(1, 2)
+
+            # apply policies
+            with record_function("TAG: Apply policies"):
+                kernel_value = eval_rbf(q_prev, P.mu_tmp[:, 0:P.n_kernels], P.sigma_tmp[:, 0:P.n_kernels], P.p)
+                # kernel_value[kernel_value < self.ker_thr] = 0
+                # ker_w = torch.exp(50*kernel_value)
+                # ker_w[kernel_value < self.ker_thr] = 0
+                # self.ker_w = torch.nan_to_num(ker_w / torch.sum(ker_w, 1).unsqueeze(1)) #normalize kernel influence
+                self.ker_w = kernel_value
+                # that's for kernel gamma(q_k) policy
+                # P.alpha_tmp[:, 0:P.n_kernels, 0] = 0
+                policy_all_flows = (P.kernel_obstacle_bases[0:P.n_kernels] @ P.alpha_tmp[:, 0:P.n_kernels].unsqueeze(3)).squeeze()
+                # disable tangential stuff, optimize just some vector field
+                # policy_all_flows = P.alpha_tmp[:, 0:P.n_kernels]
+                # that's for local gamma(q) policy
+
+                # workaround for broadcasting quirk TODO FIX
+                if P.n_kernels == 1:
+                    policy_value = (policy_all_flows * self.ker_w)[0]
+                else:
+                    policy_value = torch.sum(policy_all_flows * self.ker_w, 1)
+
+                if P.n_kernels > 0:
+                    self.kernel_val_all[:, i - 1, 0:P.n_kernels] = kernel_value.reshape((self.N_traj, P.n_kernels))
+
             with record_function("TAG: Apply policy"):
                 # policy control
-                ### policy depends on current Gamma(q) - logical, but suffers A LOT from oscillations
-                # policy_velocity = (E @ policy_value.unsqueeze(2)).squeeze(2)
                 ### policy depends on kernel Gamma(q_k) - assuming matrix multiplication done above
-                policy_velocity = policy_value
+                #policy_velocity = policy_value
+                policy_velocity = (1-l_n[:, None]) * policy_value
 
-                #policy_velocity += ((1-l_n)/100).unsqueeze(1) * E[:, :, 0]
+                #policy_velocity += ((1-l_n)/100).unsqueeze(1) * E[:, :, 0] #(some repuslion tweaking)
                 # calculate modulated vector field (and normalize)
                 nominal_velocity_norm = torch.norm(nominal_velocity, dim=1).reshape(-1, 1)
                 # TODO CHECK POLICY VELOCITY NORMALIZATION (it's way less than 1)

@@ -21,10 +21,10 @@ planner:
   collision_threshold: 0.02
 
   # navigation kernel params
-  kernel_width: 1
+  kernel_width: 0.5
   kernel_p: 2
-  alpha_sampling_sigma: 2
-  policy_update_rate: 0.5
+  alpha_sampling_sigma: 3
+  policy_update_rate: 0.1
   kernel_update_threshold: 0.002  #kernels with mean activation below this value are not updated
 
   # navigation kernel adding params
@@ -35,7 +35,7 @@ integrator:
   n_trajectories: 1
   horizon: 2
   dt: 0.01
-  collision_threshold: 0.00
+  collision_threshold: 0.05
   desired_frequency: 100
 
 simulator:

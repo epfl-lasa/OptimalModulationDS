@@ -2,6 +2,7 @@ import yaml
 import zmq
 import torch
 import time
+import numpy as np
 
 
 # define tensor parameters (cpu or cuda:0 or mps)
@@ -43,14 +44,22 @@ def main_loop():
     dummy_obs = torch.hstack((torch.zeros(n_dummy, 3) + 10, torch.zeros(n_dummy, 1) + 0.1)).to(**params)
     obs = torch.vstack((obs, dummy_obs)).to(**params)
 
-    i = 0
+    N_ITER = 0
     freq = config["obstacle_streamer"]["frequency"]
+    amplitude_array = torch.tensor([[0, 0, 0.1, 0],
+                                    [0.1, 0, 0, 0]])
+    period_array = [2, 2]
+    t_0 = time.time()
     while True:
-        socket_send_obs.send_pyobj(obs)
+        t_run = time.time() - t_0
+        delta = obs * 0
+        for i in range(len(amplitude_array)):
+            delta += amplitude_array[i] * np.sin(2 * np.pi * t_run / period_array[i])
+        socket_send_obs.send_pyobj(obs+delta)
         time.sleep(1/freq)
-        i += 1
-        if i % freq == 0:
-            print(f"Streaming at {freq} Hz for {i/120} seconds.")
+        N_ITER += 1
+        if N_ITER % freq == 0:
+            print(f"Streaming at {freq} Hz for {int(t_run):d} seconds.")
 
 if __name__ == '__main__':
     main_loop()
