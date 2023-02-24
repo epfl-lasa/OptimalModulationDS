@@ -9,7 +9,7 @@ general:
   #q_f: [1.45, 1.16, -1.12,  -1.35, 0.3, 1.87, 0]
 zmq:
   # ZMQ params
-  state_port: 1337
+  state_port: 1336
   policy_port: 1338
   obstacle_port: 1339
 

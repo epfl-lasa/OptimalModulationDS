@@ -75,8 +75,8 @@ class MPPI:
         self.reset_tensors()
         self.all_traj[:, 0, :] = self.q_cur
         P = self.Policy
-        # if P.n_kernels > 0:
-        #     self.update_kernel_normal_bases()
+        if P.n_kernels > 0:
+            self.update_kernel_normal_bases()
         for i in range(1, self.dt_H):
             with record_function("TAG: Nominal vector field"):
                 q_prev = self.all_traj[:, i - 1, :]
@@ -84,14 +84,17 @@ class MPPI:
                 nominal_velocity = (q_prev - self.qf) @ self.A
             #distance calculation (NN)
             with record_function("TAG: evaluate NN"):
-                # evaluate NN
+                # evaluate NN. Calculate kernel bases on first iteration
                 distance, self.nn_grad = self.distance_repulsion_nn(q_prev, aot=True)
-                self.nn_grad = self.nn_grad[0:self.N_traj, :] #fixes issue with aot_function cache
-                #distance, self.nn_grad = self.distance_repulsion_fk(q_prev) #not implemented for Franka
+
+                #distance, self.nn_grad = self.distance_repulsion_nn(q_prev, aot=True)
+
+                self.nn_grad = self.nn_grad[0:self.N_traj, :]               # fixes issue with aot_function cache
+                # distance, self.nn_grad = self.distance_repulsion_fk(q_prev) #not implemented for Franka
 
                 distance -= self.dst_thr
                 self.closest_dist_all[:, i - 1] = distance[0:self.N_traj]
-
+                distance = distance[0:self.N_traj]
             with record_function("TAG: QR decomposition"):
                 # calculate modulations
                 self.basis_eye_temp = self.basis_eye_temp*0 + self.basis_eye
@@ -188,8 +191,6 @@ class MPPI:
 
     def distance_repulsion_nn(self, q_prev, aot=True):
         n_inputs = q_prev.shape[0]
-        if n_inputs == 2:
-            time.sleep(0.1)
         with record_function("TAG: evaluate NN_1 (build input)"):
             # building input tensor for NN (N_traj * n_obs, n_dof + 3)
             nn_input = self.build_nn_input(q_prev, self.obs)
@@ -204,7 +205,9 @@ class MPPI:
             nn_dist -= nn_input[:, -1].unsqueeze(1)  # subtract radius
             mindist, _ = nn_dist.min(1)
             mindist, sphere_idx = mindist.reshape(self.n_obs, n_inputs).transpose(0, 1).min(1)
-            mask_idx = self.traj_range[:n_inputs] + sphere_idx * n_inputs
+            #mask_idx = self.traj_range[:n_inputs] + sphere_idx * n_inputs
+            mask_idx = torch.arange(n_inputs) + sphere_idx * n_inputs
+
             nn_input = nn_input[mask_idx, :]
 
         with record_function("TAG: evaluate NN_4 (forward+backward pass)"):
@@ -223,7 +226,7 @@ class MPPI:
         with record_function("TAG: evaluate NN_5 (process outputs)"):
             # cleaning up to get distances and gradients for closest obstacles
             nn_dist -= nn_input[:, -1].unsqueeze(1)  # subtract radius and some threshold
-            nn_dist = nn_dist[self.traj_range[:n_inputs].unsqueeze(1), nn_minidx.unsqueeze(1)]
+            nn_dist = nn_dist[torch.arange(n_inputs).unsqueeze(1), nn_minidx.unsqueeze(1)]
             # get gradients
 
             distance = nn_dist.squeeze(1)
