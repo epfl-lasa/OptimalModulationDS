@@ -20,7 +20,7 @@ def get_mindist(all_links, obs):
 
 class MPPI:
     def __init__(self, q0: torch.Tensor, qf: torch.Tensor, dh_params: torch.Tensor, obs: torch.Tensor, dt: float,
-             dt_H: int, N_traj: int, A: torch.Tensor, dh_a: torch.Tensor, nn_model):
+             dt_H: int, N_traj: int, A: torch.Tensor, dh_a: torch.Tensor, nn_model, n_closest_obs):
         self.tensor_args = {'device': q0.device, 'dtype': q0.dtype}
         self.n_dof = q0.shape[0]
         self.Policy = TensorPolicyMPPI(N_traj, self.n_dof, self.tensor_args)
@@ -52,9 +52,10 @@ class MPPI:
         self.dst_thr = 0.5
         self.qdot = torch.zeros((self.N_traj, self.n_dof)).to(**self.tensor_args)
         self.ker_thr = 1e-3
-
+        self.ignored_links = [0, 1, 2]
         self.kernel_gammas_tmp = torch.zeros(self.Policy.N_KERNEL_MAX, **self.tensor_args)
         self.kernel_obstacle_bases_tmp = torch.zeros((self.Policy.N_KERNEL_MAX, self.n_dof, self.n_dof), **self.tensor_args)
+        self.n_closest_obs = n_closest_obs
 
         for tmp in range(5):
             self.Policy.sample_policy()
@@ -197,12 +198,19 @@ class MPPI:
         with record_function("TAG: evaluate NN_3 (get closest obstacle)"):
             # rebuilding input tensor to only include closest obstacles
             nn_dist -= nn_input[:, -1].unsqueeze(1)  # subtract radius
+            nn_dist[:, self.ignored_links] = 1e6  # ignore specified links
             mindist, _ = nn_dist.min(1)
-            mindist, sphere_idx = mindist.reshape(self.n_obs, n_inputs).transpose(0, 1).min(1)
+            mindist_matrix = mindist.reshape(self.n_obs, n_inputs).transpose(0, 1)
+            mindist, sphere_idx = mindist_matrix.min(1)
+            sort_dist, sort_idx = mindist_matrix.sort(dim = 1)
+            mindist_arr = sort_dist[:, 0:self.n_closest_obs]
+            sphere_idx_arr = sort_idx[:, 0:self.n_closest_obs]
             #mask_idx = self.traj_range[:n_inputs] + sphere_idx * n_inputs
             mask_idx = torch.arange(n_inputs) + sphere_idx * n_inputs
+            #nn_input = nn_input[mask_idx, :]
 
-            nn_input = nn_input[mask_idx, :]
+            new_mask_idx = torch.arange(n_inputs).unsqueeze(1).repeat(1, self.n_closest_obs) + sphere_idx_arr * n_inputs
+            nn_input = nn_input[new_mask_idx.flatten(), :]
 
         with record_function("TAG: evaluate NN_4 (forward+backward pass)"):
             # forward + backward pass to get gradients for closest obstacles
@@ -220,10 +228,17 @@ class MPPI:
         with record_function("TAG: evaluate NN_5 (process outputs)"):
             # cleaning up to get distances and gradients for closest obstacles
             nn_dist -= nn_input[:, -1].unsqueeze(1)  # subtract radius and some threshold
-            nn_dist = nn_dist[torch.arange(n_inputs).unsqueeze(1), nn_minidx.unsqueeze(1)]
-            # get gradients
+            #extract closest link distance
+            nn_dist = nn_dist[torch.arange(self.n_closest_obs * n_inputs).unsqueeze(1), nn_minidx.unsqueeze(1)]
+            # reshape to match n_traj x n_closest_obs
+            nn_dist = nn_dist.reshape(n_inputs, self.n_closest_obs)
+            self.nn_grad = self.nn_grad.reshape(n_inputs, self.n_closest_obs, self.n_dof)
+            # weight gradients according to closest distance
+            weighting = (-10 * nn_dist).softmax(dim=-1)
+            self.nn_grad = torch.sum(self.nn_grad * weighting.unsqueeze(2), dim=1)
+            # distance - mindist
+            distance = nn_dist[:, 0]
 
-            distance = nn_dist.squeeze(1)
         return distance, self.nn_grad
 
     def update_kernel_normal_bases(self):

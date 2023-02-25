@@ -71,7 +71,8 @@ def main_loop():
     N_SUCCESS = 0
     SLEEP_SUCCESS = 1
     #set up one-step one-trajectory mppi to move the robot
-    mppi_step = MPPI(q_0, q_f, dh_params, obs, dt_sim, dt_H, N_traj, A, dh_a, nn_model)
+    n_closest_obs = config['collision_model']['closest_spheres']
+    mppi_step = MPPI(q_0, q_f, dh_params, obs, dt_sim, dt_H, N_traj, A, dh_a, nn_model, n_closest_obs)
     mppi_step.dst_thr = config['integrator']['collision_threshold']   # subtracted from actual distance (added threshsold)
     mppi_step.Policy.alpha_s *= 0
 

@@ -1,5 +1,6 @@
 collision_model:
   fname: "franka_collision_model.pt"
+  closest_spheres: 5
 
 general:
   # Initial state
@@ -15,7 +16,7 @@ zmq:
 
 planner:
   # sampling params
-  n_trajectories: 200
+  n_trajectories: 100
   horizon: 10
   dt: 0.3
   collision_threshold: 0.02

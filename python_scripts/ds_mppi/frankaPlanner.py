@@ -71,12 +71,12 @@ def main_loop():
     # [ZMQ] Receive obstacles
     obs = zmq_init_recv(socket_receive_obs)
     #primary MPPI to sample naviagtion policy
-    mppi = MPPI(q_0, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a, nn_model)
+    n_closest_obs = config['collision_model']['closest_spheres']
+    mppi = MPPI(q_0, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a, nn_model, n_closest_obs)
     mppi.Policy.sigma_c_nominal = config['planner']['kernel_width']
     mppi.Policy.alpha_s = config['planner']['alpha_sampling_sigma']
     mppi.Policy.policy_upd_rate = config['planner']['policy_update_rate']
     mppi.Policy.p = config['planner']['kernel_p']
-
     mppi.dst_thr = config['planner']['collision_threshold']       # subtracted from actual distance (added threshsold)
     mppi.ker_thr = config['planner']['kernel_update_threshold']   # used to create update mask for policy means
 
