@@ -157,7 +157,7 @@ class MPPI:
                 # policy control
                 ### policy depends on kernel Gamma(q_k) - assuming matrix multiplication done above
                 #policy_velocity = policy_value
-                policy_velocity = (1-l_n[:, None]) * policy_value
+                policy_velocity = (1-l_n[:, None]) * policy_value * (q_prev-self.qf).norm(p=2, dim=1).clamp(0,1).unsqueeze(1)
 
                 #policy_velocity += ((1-l_n)/100).unsqueeze(1) * E[:, :, 0] #(some repuslion tweaking)
                 # calculate modulated vector field (and normalize)

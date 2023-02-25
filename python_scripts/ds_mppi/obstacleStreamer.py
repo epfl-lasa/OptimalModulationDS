@@ -20,8 +20,9 @@ def main_loop():
     socket_send_obs = context.socket(zmq.PUB)
     socket_send_obs.bind("tcp://*:%d" % config["zmq"]["obstacle_port"])
 
-
+    ########################################
     ### I-Shape centered in front of franka
+    ########################################
     x_dist = 0.4
     y_width = 0.4
     z_0 = 0.1
@@ -39,15 +40,31 @@ def main_loop():
     bottom_mid = top_mid - torch.tensor([0, 0, height, 0])
     middle_bar = bottom_mid + torch.linspace(0, 1, n_vertical).reshape(-1, 1) * (top_mid - bottom_mid)
     obs = torch.vstack((top_bar, middle_bar, bottom_bar))
-    # obs = torch.vstack((middle_bar, bottom_bar))
+    ########################################
+    ### ring constrained
+    ########################################
+
+    center = torch.tensor([0.55, 0, 0.6])
+    radius = 0.25
+    n_ring = 60
+    ring = torch.zeros(n_ring, 4)
+    ring[:, 0] = center[0]
+    ring[:, 1] = center[1] + radius * torch.cos(torch.linspace(0, 2 * np.pi, n_ring))
+    ring[:, 2] = center[2] + radius * torch.sin(torch.linspace(0, 2 * np.pi, n_ring))
+    ring[:, 3] = 0.03
+    obs = ring
+
+    ########################################
+    ### Dummy obstacle
+    ########################################
     n_dummy = 1
     dummy_obs = torch.hstack((torch.zeros(n_dummy, 3) + 10, torch.zeros(n_dummy, 1) + 0.1)).to(**params)
     obs = torch.vstack((obs, dummy_obs)).to(**params)
 
     N_ITER = 0
     freq = config["obstacle_streamer"]["frequency"]
-    amplitude_array = torch.tensor([[0, 0, 0.0, 0],
-                                    [0.01, 0, 0, 0]])
+    amplitude_array = torch.tensor([[0.0, 0.0, 0.0, 0],
+                                    [0.0, 0.0, 0.0, 0]])
     period_array = [2, 2]
     t_0 = time.time()
     while True:
