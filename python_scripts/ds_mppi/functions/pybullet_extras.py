@@ -7,13 +7,12 @@ class SphereManager:
     def __init__(self, pybullet_client):
         self.pb = pybullet_client
         self.spheres = []
-        self.color = [.7, .1, .1, .9]
+        self.color = [.7, .1, .1, 1]
 
     def create_sphere(self, position, radius, color):
         sphere = self.pb.createVisualShape(self.pb.GEOM_SPHERE,
                                            radius=radius,
-                                           rgbaColor=color,
-                                           specularColor=[0.4, .4, 0])
+                                           rgbaColor=color)
         sphere = self.pb.createMultiBody(baseVisualShapeIndex=sphere,
                                          basePosition=position)
         self.spheres.append(sphere)

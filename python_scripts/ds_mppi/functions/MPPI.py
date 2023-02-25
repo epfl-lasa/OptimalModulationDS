@@ -53,14 +53,14 @@ class MPPI:
         self.qdot = torch.zeros((self.N_traj, self.n_dof)).to(**self.tensor_args)
         self.ker_thr = 1e-3
 
-        self.kernel_gammas = torch.zeros(self.Policy.N_KERNEL_MAX, **self.tensor_args)
-        self.kernel_obstacle_bases = torch.zeros((self.Policy.N_KERNEL_MAX, self.n_dof, self.n_dof), **self.tensor_args)
+        self.kernel_gammas_tmp = torch.zeros(self.Policy.N_KERNEL_MAX, **self.tensor_args)
+        self.kernel_obstacle_bases_tmp = torch.zeros((self.Policy.N_KERNEL_MAX, self.n_dof, self.n_dof), **self.tensor_args)
 
         for tmp in range(5):
             self.Policy.sample_policy()
             _, _, _ = self.propagate()
             numeric_fk_model(self.q_cur, dh_params, 10)
-            print('Warmup done')
+            print(f'warmup run #{tmp+1} done')
 
     def reset_tensors(self):
         self.all_traj = self.all_traj * 0
@@ -75,8 +75,6 @@ class MPPI:
         self.reset_tensors()
         self.all_traj[:, 0, :] = self.q_cur
         P = self.Policy
-        if P.n_kernels > 0:
-            self.update_kernel_normal_bases()
         for i in range(1, self.dt_H):
             with record_function("TAG: Nominal vector field"):
                 q_prev = self.all_traj[:, i - 1, :]
@@ -86,8 +84,6 @@ class MPPI:
             with record_function("TAG: evaluate NN"):
                 # evaluate NN. Calculate kernel bases on first iteration
                 distance, self.nn_grad = self.distance_repulsion_nn(q_prev, aot=True)
-
-                #distance, self.nn_grad = self.distance_repulsion_nn(q_prev, aot=True)
 
                 self.nn_grad = self.nn_grad[0:self.N_traj, :]               # fixes issue with aot_function cache
                 # distance, self.nn_grad = self.distance_repulsion_fk(q_prev) #not implemented for Franka
@@ -134,8 +130,6 @@ class MPPI:
 
             # apply policies
             with record_function("TAG: Apply policies"):
-                tmp_basis = P.kernel_obstacle_bases[0:P.n_kernels]*0 + torch.eye(self.n_dof).to(**self.tensor_args)
-                #ker_dist, ker_grad = self.distance_repulsion_nn(P.mu_c[0:P.n_kernels])
                 kernel_value = eval_rbf(q_prev, P.mu_tmp[:, 0:P.n_kernels], P.sigma_tmp[:, 0:P.n_kernels], P.p)
                 # kernel_value[kernel_value < self.ker_thr] = 0
                 # ker_w = torch.exp(50*kernel_value)
@@ -189,7 +183,7 @@ class MPPI:
         return self.all_traj, self.closest_dist_all, self.kernel_val_all[:, :, 0:P.n_kernels]
 
 
-    def distance_repulsion_nn(self, q_prev, aot=True):
+    def distance_repulsion_nn(self, q_prev, aot=False):
         n_inputs = q_prev.shape[0]
         with record_function("TAG: evaluate NN_1 (build input)"):
             # building input tensor for NN (N_traj * n_obs, n_dof + 3)
@@ -233,9 +227,27 @@ class MPPI:
         return distance, self.nn_grad
 
     def update_kernel_normal_bases(self):
-        # calculate gamma and repulsion for kernel centers
-        dst, grad = self.distance_repulsion_nn(self.Policy.mu_c[0:self.Policy.n_kernels], aot=False)
+        if self.Policy.n_kernels > 0:
+            # reset tensors for current bases
+            self.kernel_obstacle_bases_tmp *= 0
+            self.kernel_obstacle_bases_tmp[0:self.Policy.n_kernels][:] += torch.eye(self.n_dof)
+
+            # calculate gamma and repulsion for kernel centers
+            dst, grad = self.distance_repulsion_nn(self.Policy.mu_c[0:self.Policy.n_kernels], aot=False)
+            self.kernel_obstacle_bases_tmp[0:self.Policy.n_kernels][:, :, 0] = grad
+
+            #perform qr decomposition
+            E, R = torch.linalg.qr(self.kernel_obstacle_bases_tmp[0:self.Policy.n_kernels].cpu().to(torch.float32))
+            E = E.to(**self.tensor_args)
+            E[:, :, 0] = grad / grad.norm(2, 1).unsqueeze(1)
+            # print((self.Policy.kernel_obstacle_bases[0:self.Policy.n_kernels] - E).norm(p=2)) #debug update difference
+
+            # update policies kernel bases
+            self.Policy.kernel_obstacle_bases[0:self.Policy.n_kernels] = E
+        else:
+            pass
         return 0
+
     def distance_repulsion_fk(self, q_prev):
         all_links, all_int_pts = numeric_fk_model_vec(q_prev, self.dh_params, 10)
         distance, idx_obs_closest, idx_links_closest, idx_pts_closest = get_mindist(all_links, self.obs)

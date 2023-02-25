@@ -100,6 +100,9 @@ def main_loop():
         obstacles_data, obs_recv_status = zmq_try_recv(mppi.obs, socket_receive_obs)
         mppi.update_obstacles(obstacles_data)
 
+        # Update kernel tangential spaces wrt to new obstacles
+        if config['planner']['update_kernel_bases']:
+            mppi.update_kernel_normal_bases()
         # Sample random policies
         mppi.Policy.sample_policy()
         # Propagate modulated DS

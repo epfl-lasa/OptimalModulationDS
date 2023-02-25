@@ -19,14 +19,14 @@ def main_loop():
     p.connect(p.GUI, options='--background_color_red=0.2 --background_color_green=0.2' +
                              ' --background_color_blue=0.2 --width=1600 --height=1000')
     p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
-    p.configureDebugVisualizer(lightPosition=[20, 0, 100])
+    p.configureDebugVisualizer(lightPosition=[5, 0, 2])
     p.setPhysicsEngineParameter(maxNumCmdPer1ms=1000)
     p.resetDebugVisualizerCamera(cameraDistance=1, cameraYaw=90, cameraPitch=0, cameraTargetPosition=[0, 0, 0.5])
     p.setAdditionalSearchPath(pd.getDataPath())
     timeStep = 0.01
     p.setTimeStep(timeStep)
     p.setGravity(0, 0, -9.81)
-
+    p.setRealTimeSimulation(1)
     ## spawn franka robot
     base_pos = [0, 0, 0]
     base_rot = p.getQuaternionFromEuler([0, 0, 0])

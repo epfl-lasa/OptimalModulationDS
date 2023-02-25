@@ -24,7 +24,7 @@ class RobotSdfCollisionNet():
         # self.m = torch.zeros((500, 1)).to('cuda:0')
         # self.m[:, 0] = 1
         self.order = list(range(self.out_channels))
-
+        self.ignore_links = [0, 1, 2]
     def set_link_order(self, order):
         self.order = order
 
@@ -152,6 +152,7 @@ class RobotSdfCollisionNet():
 
     def functorch_vjp(self, points):
         dists, vjp_fn = vjp(self.model.forward, points)
+        dists[:, self.ignore_links] += 1e3
         minIdx = torch.argmin(dists, dim=1)
         grad_v = torch.zeros(points.shape[0], self.out_channels).to(points.device)
         grad_v[list(range(points.shape[0])), minIdx] = 1
