@@ -136,13 +136,19 @@ def main_loop():
             kernel_fk, _ = numeric_fk_model(kernel_candidates[idx_to_add], dh_params, 2)
             all_kernel_fk.append(kernel_fk[1:].flatten(0, 1))
 
+
+        # draw best trajectory
+        best_idx = torch.argmin(cost)
+        best_traj_fk, _ = numeric_fk_model_vec(mppi.all_traj[best_idx:best_idx+1].view(-1, 7), dh_params, 2)
+
         # [ZMQ] Send current policy to integrator
         data = {'n_kernels': mppi.Policy.n_kernels,
                 'mu_c': mppi.Policy.mu_c[0:mppi.Policy.n_kernels],
                 'alpha_c': mppi.Policy.alpha_c[0:mppi.Policy.n_kernels],
                 'sigma_c': mppi.Policy.sigma_c[0:mppi.Policy.n_kernels],
                 'norm_basis': mppi.Policy.kernel_obstacle_bases[0:mppi.Policy.n_kernels],
-                'kernel_fk': all_kernel_fk}
+                'kernel_fk': all_kernel_fk,
+                'best_traj_fk': best_traj_fk.view(dt_H, -1, 3)}
 
         socket_send_policy.send_pyobj(data)
 

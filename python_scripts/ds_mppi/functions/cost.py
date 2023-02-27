@@ -11,10 +11,10 @@ class Cost:
         self.q_max = torch.tensor([2.8973, 1.7628, 2.8973, -0.0698, 2.8973, 3.7525, 2.8973])
         self.rest = self.q_min + (self.q_max - self.q_min) * 0.5
     def evaluate_costs(self, all_traj, closest_dist_all):
-        goal_cost = 1*self.goal_cost(all_traj[:, -1, :], self.qf)
-        collision_cost = 10*self.collision_cost(closest_dist_all)
+        goal_cost = 10*self.goal_cost(all_traj[:, -1, :], self.qf)
+        collision_cost = 100*self.collision_cost(closest_dist_all)
         joint_limits_cost = 1*self.joint_limits_cost(all_traj)
-        stagnation_cost = 1*goal_cost * self.stagnation_cost(all_traj)
+        stagnation_cost = 10*goal_cost * self.stagnation_cost(all_traj)
 
         fk_cost = 10*self.fk_cost(all_traj[:, -1, :])
 

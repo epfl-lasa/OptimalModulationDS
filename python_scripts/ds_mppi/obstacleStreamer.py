@@ -44,7 +44,7 @@ def main_loop():
     ### ring constrained
     ########################################
 
-    center = torch.tensor([0.55, 0, 0.6])
+    center = torch.tensor([.75, 0, 0.6])
     radius = 0.25
     n_ring = 60
     ring = torch.zeros(n_ring, 4)

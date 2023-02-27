@@ -52,6 +52,9 @@ def main_loop():
     obs = []
     sphere_manager = SphereManager(p)
     kernel_manager = KernelManager(p)
+    trajectory_manager = KernelManager(p)
+    trajectory_manager.width = 2
+    trajectory_manager.color = [1, 0, 1]
     ## main loop
     i = 0
     no_ker_upd = 0
@@ -64,7 +67,11 @@ def main_loop():
 
         # [ZMQ] Receive policy from planner
         policy_data, policy_recv_status = zmq_try_recv(policy_data, socket_receive_policy)
-        kernel_manager.update_kernels(policy_data)
+        kernel_manager.update_kernels(policy_data, 'kernel_fk')
+        # if policy_recv_status:
+        #     trajectory_manager.delete_kernels()
+        #     trajectory_manager.update_kernels(policy_data, 'best_traj_fk')
+
         if not policy_recv_status:
             no_ker_upd += 1
         else:
