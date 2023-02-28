@@ -28,8 +28,8 @@ def main_loop():
     z_0 = 0.1
     height = 0.75
     r = 0.05
-    n_vertical = 20
-    n_horizontal = 20
+    n_vertical = 10
+    n_horizontal = 10
 
     top_left = torch.tensor([x_dist, -y_width, z_0+height, r])
     top_right = torch.tensor([x_dist, y_width, z_0+height, r])
@@ -52,7 +52,7 @@ def main_loop():
     ring[:, 1] = center[1] + radius * torch.cos(torch.linspace(0, 2 * np.pi, n_ring))
     ring[:, 2] = center[2] + radius * torch.sin(torch.linspace(0, 2 * np.pi, n_ring))
     ring[:, 3] = 0.03
-    obs = ring
+    #obs = ring
 
     ########################################
     ### Dummy obstacle

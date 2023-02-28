@@ -67,16 +67,16 @@ def main_loop():
 
         # [ZMQ] Receive policy from planner
         policy_data, policy_recv_status = zmq_try_recv(policy_data, socket_receive_policy)
-        kernel_manager.update_kernels(policy_data, 'kernel_fk')
-        # if policy_recv_status:
-        #     trajectory_manager.delete_kernels()
-        #     trajectory_manager.update_kernels(policy_data, 'best_traj_fk')
+        if policy_recv_status and 1:
+            kernel_manager.update_kernels(policy_data, 'kernel_fk')
+            # trajectory_manager.delete_kernels()
+            # trajectory_manager.update_kernels(policy_data, 'best_traj_fk')
 
         if not policy_recv_status:
             no_ker_upd += 1
         else:
             no_ker_upd = 0
-        if no_ker_upd > 0.5*desired_frequency: # if no policy update for 0.5 seconds, delete kernels
+        if no_ker_upd > 1*desired_frequency: # if no policy update for 0.5 seconds, delete kernels
             kernel_manager.delete_kernels()
             no_ker_upd = 0
             policy_data = None

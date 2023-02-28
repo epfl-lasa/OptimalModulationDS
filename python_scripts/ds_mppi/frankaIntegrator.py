@@ -86,6 +86,7 @@ def main_loop():
     des_freq = config['integrator']['desired_frequency']
     t0 = time.time()
     iter_traj = 0
+    res_arr = []
     while torch.norm(mppi_step.q_cur - q_f)+1 > 0.001:
         t_iter_start = time.time()
 
@@ -114,6 +115,10 @@ def main_loop():
             mppi_step.q_cur = q_0
             socket_send_state.send_pyobj(mppi_step.q_cur)
             print(f'Trajectory reached in {N_ITER_TRAJ} iterations.')
+            res_arr.append(N_ITER_TRAJ)
+            print(res_arr)
+            print(len(res_arr), np.mean(res_arr), np.std(res_arr))
+
             N_ITER_TRAJ = 0
             N_SUCCESS += 1
             time.sleep(1)

@@ -148,7 +148,7 @@ def main_loop():
                 'sigma_c': mppi.Policy.sigma_c[0:mppi.Policy.n_kernels],
                 'norm_basis': mppi.Policy.kernel_obstacle_bases[0:mppi.Policy.n_kernels],
                 'kernel_fk': all_kernel_fk,
-                'best_traj_fk': best_traj_fk.view(dt_H, -1, 3)}
+                'best_traj_fk': best_traj_fk.view(dt_H, -1, 3)[-1].unsqueeze(0)}
 
         socket_send_policy.send_pyobj(data)
 

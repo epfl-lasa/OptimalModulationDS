@@ -143,19 +143,17 @@ class MPPI:
                 # ker_w[kernel_value < self.ker_thr] = 0
                 # self.ker_w = torch.nan_to_num(ker_w / torch.sum(ker_w, 1).unsqueeze(1)) #normalize kernel influence
                 self.ker_w = kernel_value
-                # that's for kernel gamma(q_k) policy
-                # P.alpha_tmp[:, 0:P.n_kernels, 0] = 0
+                #### important to nullify first component (one for normal direction)
+                P.alpha_tmp[:, 0:P.n_kernels, 0] = 0
+                #### that's for kernel gamma(q_k) policy
                 policy_all_flows = (P.kernel_obstacle_bases[0:P.n_kernels] @ P.alpha_tmp[:, 0:P.n_kernels].unsqueeze(3)).squeeze()
-                # disable tangential stuff, optimize just some vector field
-                # policy_all_flows = P.alpha_tmp[:, 0:P.n_kernels]
-                # that's for local gamma(q) policy
+                #### disable tangential stuff, optimize just some vector field
+                #policy_all_flows = P.alpha_tmp[:, 0:P.n_kernels].squeeze()
+                #### that's for local gamma(q) policy
+                # policy_all_flows = torch.matmul(E[:, None], P.alpha_tmp[:, 0:P.n_kernels].unsqueeze(3)).squeeze(-1)
 
-                # workaround for broadcasting quirk TODO FIX
-                if P.n_kernels == 1:
-                    policy_value = (policy_all_flows * self.ker_w)[0]
-                else:
-                    policy_value = torch.sum(policy_all_flows * self.ker_w, 1)
-
+                # sum weighted inputs from kernels
+                policy_value = torch.sum(policy_all_flows * self.ker_w, 1)
                 if P.n_kernels > 0:
                     self.kernel_val_all[:, i - 1, 0:P.n_kernels] = kernel_value.reshape((self.N_traj, P.n_kernels))
 
@@ -165,11 +163,12 @@ class MPPI:
                 #policy_velocity = policy_value
                 collision_activation = (1-l_n[:, None])
                 velocity_activation = (1-l_vel[:, None])
-                goal_activation = (q_prev-self.qf).norm(p=2, dim=1).clamp(0, 1).unsqueeze(1)
-                goal_activation[goal_activation < 0.5 ] = 0
+                goal_activation = (q_prev-self.qf).norm(p=0.5, dim=1).clamp(0, 1).unsqueeze(1)
+                goal_activation[goal_activation < 0.3] = 0
                 policy_velocity = collision_activation * velocity_activation * goal_activation * policy_value
+                # policy_velocity = velocity_activation * policy_value
                 if self.N_traj == 1:
-                    print(collision_activation, velocity_activation)
+                    print(collision_activation.item(), velocity_activation.item())
                 #policy_velocity += ((1-l_n)/100).unsqueeze(1) * E[:, :, 0] #(some repuslion tweaking)
                 # calculate modulated vector field (and normalize)
 
