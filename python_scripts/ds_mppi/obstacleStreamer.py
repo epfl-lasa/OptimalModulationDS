@@ -44,7 +44,7 @@ def main_loop():
     ### ring constrained
     ########################################
 
-    center = torch.tensor([.75, 0, 0.6])
+    center = torch.tensor([.55, 0, 0.6])
     radius = 0.2
     n_ring = 21
     ring = torch.zeros(n_ring, 4)
@@ -52,7 +52,7 @@ def main_loop():
     ring[:, 1] = center[1] + radius * torch.cos(torch.linspace(0, 2 * np.pi, n_ring))
     ring[:, 2] = center[2] + radius * torch.sin(torch.linspace(0, 2 * np.pi, n_ring))
     ring[:, 3] = 0.03
-    #obs = ring
+    obs = ring
 
     ########################################
     ### Dummy obstacle

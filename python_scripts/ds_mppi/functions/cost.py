@@ -13,7 +13,7 @@ class Cost:
     def evaluate_costs(self, all_traj, closest_dist_all):
         goal_cost = 10*self.goal_cost(all_traj[:, -1, :], self.qf)
         collision_cost = 100*self.collision_cost(closest_dist_all)
-        joint_limits_cost = 1*self.joint_limits_cost(all_traj)
+        joint_limits_cost = 100*self.joint_limits_cost(all_traj)
         stagnation_cost = 10*goal_cost * self.stagnation_cost(all_traj)
 
         fk_cost = 10*self.fk_cost(all_traj[:, -1, :])
