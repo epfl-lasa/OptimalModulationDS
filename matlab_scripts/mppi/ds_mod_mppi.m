@@ -26,6 +26,7 @@ q_max = [k1*pi, k2*pi, 10, 10];
 box = [q_min(1:2); q_max(1:2)];
 u_box = 2*[-1, 1; -1 1]';
 pos_init = [0.5*pi, 0.5*pi]';
+pos_init = [.4, 0.5]';
 pos_goal = [-0.5*pi, -0.5*pi]';
 
 %figure
@@ -130,7 +131,7 @@ for i = 1:1:N_ITER
     %calculate velocity
     g = max(1e-8, dist-thr+1);
     l_n = max(0, 1 - 1/g);
-    l_tau = min(1, 1 + 1/g);
+    l_tau = min(2, 1 + 1/g);
     E = [n_v tau_v];
     D = [l_n 0;
          0 l_tau];

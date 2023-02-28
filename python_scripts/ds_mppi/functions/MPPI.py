@@ -81,6 +81,9 @@ class MPPI:
                 q_prev = self.all_traj[:, i - 1, :]
                 # calculate nominal vector field
                 nominal_velocity = (q_prev - self.qf) @ self.A
+                nominal_velocity_norm = torch.norm(nominal_velocity, dim=1).reshape(-1, 1)
+                nominal_velocity_normalized = nominal_velocity / nominal_velocity_norm
+
             #distance calculation (NN)
             with record_function("TAG: evaluate NN"):
                 # evaluate NN. Calculate kernel bases on first iteration
@@ -100,6 +103,9 @@ class MPPI:
                 E = E.to(**self.tensor_args)
                 E[:, :, 0] = self.nn_grad / self.nn_grad.norm(2, 1).unsqueeze(1)
                 self.norm_basis[:, i-1] = E
+
+                dotproduct = (E[:, :, 0] * nominal_velocity_normalized).sum(dim=-1)
+                l_vel = generalized_sigmoid(dotproduct, 0, 1, -0.2, 0, 100)
             with record_function("TAG: Modulation-propagation"):
                 # calculate standard modulation coefficients
                 # gamma = distance + 1
@@ -117,15 +123,15 @@ class MPPI:
                     # for franka robot (meters)
                     dist_low, dist_high = 0.01, 0.1
                     k_sigmoid = 100
-
                 ln_min, ln_max = 0, 1
-                ltau_min, ltau_max = 1, 10
+                ltau_min, ltau_max = 1, 3
                 l_n = generalized_sigmoid(distance, ln_min, ln_max, dist_low, dist_high, k_sigmoid)
+                l_n_vel = l_vel * 1 + (1 - l_vel) * l_n
                 l_tau = generalized_sigmoid(distance, ltau_max, ltau_min, dist_low, dist_high, k_sigmoid)
                 # self.D = self.D * 0 + torch.eye(self.n_dof).to(**self.tensor_args)
                 # self.D = l_tau[:, None, None] * self.D
                 self.D = l_tau.repeat_interleave(self.n_dof).reshape((self.N_traj, self.n_dof)).diag_embed(0, 1, 2)
-                self.D[:, 0, 0] = l_n
+                self.D[:, 0, 0] = l_n_vel
                 # build modulation matrix
                 M = E @ self.D @ E.transpose(1, 2)
 
@@ -157,11 +163,15 @@ class MPPI:
                 # policy control
                 ### policy depends on kernel Gamma(q_k) - assuming matrix multiplication done above
                 #policy_velocity = policy_value
-                policy_velocity = (1-l_n[:, None]) * policy_value * (q_prev-self.qf).norm(p=2, dim=1).clamp(0,1).unsqueeze(1)
-
+                collision_activation = (1-l_n[:, None])
+                velocity_activation = (1-l_vel[:, None])
+                goal_activation = (q_prev-self.qf).norm(p=2, dim=1).clamp(0, 1).unsqueeze(1)
+                policy_velocity = collision_activation * velocity_activation * goal_activation * policy_value
+                if self.N_traj == 1:
+                    print(collision_activation, velocity_activation)
                 #policy_velocity += ((1-l_n)/100).unsqueeze(1) * E[:, :, 0] #(some repuslion tweaking)
                 # calculate modulated vector field (and normalize)
-                nominal_velocity_norm = torch.norm(nominal_velocity, dim=1).reshape(-1, 1)
+
                 # TODO CHECK POLICY VELOCITY NORMALIZATION (it's way less than 1)
                 # policy_velocity = policy_velocity * nominal_velocity_norm             # magnitude of nominal velocity
                 total_velocity = nominal_velocity + policy_velocity                   # magnitude of 2x nominal velocity
