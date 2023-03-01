@@ -108,7 +108,7 @@ class MPPI:
 
                 dotproduct = (E[:, :, 0] * nominal_velocity_normalized).sum(dim=-1)
                 self.dot_products[:, i-1] = dotproduct
-                l_vel = generalized_sigmoid(dotproduct, 0, 1, 0.3, 0.5, 100)
+                l_vel = generalized_sigmoid(dotproduct, 0, 1, -0.2, 0.0, 100)
             with record_function("TAG: Modulation-propagation"):
                 # calculate standard modulation coefficients
                 # gamma = distance + 1
@@ -124,8 +124,8 @@ class MPPI:
                     k_sigmoid = 3
                 else:
                     # for franka robot (meters)
-                    dist_low, dist_high = 0.05, 0.1
-                    k_sigmoid = 200
+                    dist_low, dist_high = 0.03, 0.1
+                    k_sigmoid = 100
                 ln_min, ln_max = 0, 1
                 ltau_min, ltau_max = 1, 3
                 l_n = generalized_sigmoid(distance, ln_min, ln_max, dist_low, dist_high, k_sigmoid)
@@ -155,7 +155,7 @@ class MPPI:
                 #### that's for local gamma(q) policy
                 # policy_all_flows = torch.matmul(E[:, None], P.alpha_tmp[:, 0:P.n_kernels].unsqueeze(3)).squeeze(-1)
 
-                # sum weighted inputs from kernels #### BUG HERE!!!!
+                # sum weighted inputs from kernels #### BUG HERE [FIXED FINALLY]!!!!
                 policy_value = torch.sum(policy_all_flows * self.ker_w, 1)
                 # for one kernel policy_all_flows [100, 7], ker_w [100, 1, 1]
                 # valid multiplication
