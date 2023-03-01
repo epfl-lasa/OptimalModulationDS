@@ -5,12 +5,16 @@ import time
 import numpy as np
 
 
+def read_yaml(fname):
+    with open(fname) as file:
+        config = yaml.load(file, Loader=yaml.FullLoader)
+    return config
+
 # define tensor parameters (cpu or cuda:0 or mps)
 params = {'device': 'cpu', 'dtype': torch.float32}
 def main_loop():
 
-    with open('config.yaml') as file:
-        config = yaml.load(file, Loader=yaml.FullLoader)
+    config = read_yaml('config.yaml')
 
     ########################################
     ###            ZMQ SETUP             ###
@@ -39,7 +43,7 @@ def main_loop():
     top_mid = top_left + 0.5 * (top_right - top_left)
     bottom_mid = top_mid - torch.tensor([0, 0, height, 0])
     middle_bar = bottom_mid + torch.linspace(0, 1, n_vertical).reshape(-1, 1) * (top_mid - bottom_mid)
-    obs = torch.vstack((top_bar, middle_bar, bottom_bar))
+    tshape = torch.vstack((top_bar, middle_bar, bottom_bar))
     ########################################
     ### ring constrained
     ########################################
@@ -52,14 +56,13 @@ def main_loop():
     ring[:, 1] = center[1] + radius * torch.cos(torch.linspace(0, 2 * np.pi, n_ring))
     ring[:, 2] = center[2] + radius * torch.sin(torch.linspace(0, 2 * np.pi, n_ring))
     ring[:, 3] = 0.03
-    #obs = ring
 
     ########################################
     ### Dummy obstacle
     ########################################
-    n_dummy = 1
-    dummy_obs = torch.hstack((torch.zeros(n_dummy, 3) + 10, torch.zeros(n_dummy, 1) + 0.1)).to(**params)
-    obs = torch.vstack((obs, dummy_obs)).to(**params)
+    # n_dummy = 1
+    # dummy_obs = torch.hstack((torch.zeros(n_dummy, 3) + 10, torch.zeros(n_dummy, 1) + 0.1)).to(**params)
+    # obs = torch.vstack((obs, dummy_obs)).to(**params)
 
     N_ITER = 0
     freq = config["obstacle_streamer"]["frequency"]
@@ -68,6 +71,13 @@ def main_loop():
     period_array = [2, 2]
     t_0 = time.time()
     while True:
+        config = read_yaml('config.yaml')
+        if config["collision_model"]["obstacle"] == 'ring':
+            obs = ring
+        elif config["collision_model"]["obstacle"] == 'tshape':
+            obs = tshape
+        else:
+            obs = torch.tensor([[0.3, 0.0, 0.0, 0.01]])
         t_run = time.time() - t_0
         delta = obs * 0
         for i in range(len(amplitude_array)):

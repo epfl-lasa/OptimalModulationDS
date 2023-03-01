@@ -1,6 +1,7 @@
 collision_model:
   fname: "franka_collision_model.pt"
   closest_spheres: 5
+  obstacle: "tshape"
 
 general:
   # Initial state
@@ -31,7 +32,7 @@ planner:
   collision_threshold: 0.01
 
   # navigation kernel params
-  kernel_width: 0.5
+  kernel_width: 1
   kernel_p: 2
   alpha_sampling_sigma: 3
   policy_update_rate: 0.5
