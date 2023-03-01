@@ -31,6 +31,10 @@ class TensorPolicyMPPI:
         self.sigma_tmp = torch.zeros((self.n_traj, self.N_KERNEL_MAX), **self.params)
         self.alpha_tmp = torch.zeros((self.n_traj, self.N_KERNEL_MAX, self.n_dof), **self.params)
 
+        self.q_min = torch.tensor([-2.8973, -1.7628, -2.8973, -3.0718, -2.8973, -0.0175, -2.8973])
+        self.q_max = torch.tensor([2.8973, 1.7628, 2.8973, -0.0698, 2.8973, 3.7525, 2.8973])
+        self.rest = self.q_min + (self.q_max - self.q_min) * 0.5
+
         # kernel obstacle parameters
         self.kernel_gammas = torch.zeros(self.N_KERNEL_MAX, **self.params)
         self.kernel_obstacle_bases = torch.zeros((self.N_KERNEL_MAX, self.n_dof, self.n_dof), **self.params)
@@ -66,12 +70,19 @@ class TensorPolicyMPPI:
                                                 + self.sigma_c[:self.n_kernels]
         self.alpha_tmp[:, :self.n_kernels] = self.alpha_tmp[:, :self.n_kernels].normal_(mean=0, std=self.alpha_s) \
                                                 + self.alpha_c[:self.n_kernels]
+        #inject rest pose reaching
+        if self.n_traj > 5:
+            self.alpha_tmp[0, :self.n_kernels] = -(self.mu_c[:self.n_kernels] - self.rest)
+            self.alpha_tmp[1, :self.n_kernels] = -2*(self.mu_c[:self.n_kernels] - self.rest)
+            self.alpha_tmp[2, :self.n_kernels] = -5*(self.mu_c[:self.n_kernels] - self.rest)
+            self.alpha_tmp[3, :self.n_kernels] = -10*(self.mu_c[:self.n_kernels] - self.rest)
 
         # self.alpha_tmp[:, :self.n_kernels, 0] = 0 ## important to nullify the first component of alpha (currently also doing it in MPPI.py)
         # normalize alpha, as they should represent a vector (hinders performance as it interferes with sampling exploration)
         # self.alpha_tmp[:, :self.n_kernels] = self.alpha_tmp[:, :self.n_kernels] / \
         #                                     torch.norm(self.alpha_tmp[:, :self.n_kernels], dim=2, keepdim=True)
         # self.alpha_tmp[:, :self.n_kernels] = torch.nan_to_num(self.alpha_tmp[:, :self.n_kernels])
+        # self.alpha_tmp[:, :self.n_kernels]+=torch.tensor([0,-3,0,-3,0,0,0])
     def update_policy(self, w, upd_rate, update_mask=None):
         # Update policy parameters, use current state(mu_c, sigma_c and alpha_c)
         # and a sampled policy (mu_tmp, sigma_tmp, alpha_tmp) with weights w
