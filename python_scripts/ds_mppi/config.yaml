@@ -39,8 +39,8 @@ planner:
   update_kernel_bases: False # change tangential basis (may be useful for moving obstacles)
 
   # navigation kernel adding params
-  kernel_adding_collision_thr: 0.05
-  kernel_adding_kernels_thr: 0.1 #(rbf value, lower it is - sparser the kernels - depends on kernel_width a lot)
+  kernel_adding_collision_thr: 0.01
+  kernel_adding_kernels_thr: 0.3 #(rbf value, lower it is - sparser the kernels - depends on kernel_width a lot)
 
 integrator:
   n_trajectories: 1

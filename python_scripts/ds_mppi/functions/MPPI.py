@@ -6,7 +6,7 @@ from math import pi
 
 from torch.profiler import record_function
 import asyncio
-
+torch.set_printoptions(linewidth=200, sci_mode=False)
 
 
 @torch.jit.script
@@ -105,7 +105,7 @@ class MPPI:
                 self.norm_basis[:, i-1] = E
 
                 dotproduct = (E[:, :, 0] * nominal_velocity_normalized).sum(dim=-1)
-                l_vel = generalized_sigmoid(dotproduct, 0, 1, -0.2, 0, 100)
+                l_vel = generalized_sigmoid(dotproduct, 0, 1, 0.3, 0.5, 100)
             with record_function("TAG: Modulation-propagation"):
                 # calculate standard modulation coefficients
                 # gamma = distance + 1
@@ -143,14 +143,14 @@ class MPPI:
                 # ker_w[kernel_value < self.ker_thr] = 0
                 # self.ker_w = torch.nan_to_num(ker_w / torch.sum(ker_w, 1).unsqueeze(1)) #normalize kernel influence
                 self.ker_w = kernel_value
-                #### important to nullify first component (one for normal direction)
-                P.alpha_tmp[:, 0:P.n_kernels, 0] = 0
+                #### important to nullify first component (to ensure tangential motion)
+                # P.alpha_tmp[:, 0:P.n_kernels, 0] = 0
                 #### that's for kernel gamma(q_k) policy
-                policy_all_flows = (P.kernel_obstacle_bases[0:P.n_kernels] @ P.alpha_tmp[:, 0:P.n_kernels].unsqueeze(3)).squeeze()
+                # policy_all_flows = (P.kernel_obstacle_bases[0:P.n_kernels] @ P.alpha_tmp[:, 0:P.n_kernels].unsqueeze(3)).squeeze()
                 #### disable tangential stuff, optimize just some vector field
-                #policy_all_flows = P.alpha_tmp[:, 0:P.n_kernels].squeeze()
+                # policy_all_flows = P.alpha_tmp[:, 0:P.n_kernels].squeeze()
                 #### that's for local gamma(q) policy
-                # policy_all_flows = torch.matmul(E[:, None], P.alpha_tmp[:, 0:P.n_kernels].unsqueeze(3)).squeeze(-1)
+                policy_all_flows = torch.matmul(E[:, None], P.alpha_tmp[:, 0:P.n_kernels].unsqueeze(3)).squeeze(-1)
 
                 # sum weighted inputs from kernels
                 policy_value = torch.sum(policy_all_flows * self.ker_w, 1)
@@ -173,7 +173,7 @@ class MPPI:
                 # calculate modulated vector field (and normalize)
 
                 # TODO CHECK POLICY VELOCITY NORMALIZATION (it's way less than 1)
-                # policy_velocity = policy_velocity * nominal_velocity_norm             # magnitude of nominal velocity
+                policy_velocity = policy_velocity * nominal_velocity_norm             # magnitude of nominal velocity
                 total_velocity = nominal_velocity + policy_velocity                   # magnitude of 2x nominal velocity
                 # total_velocity_norm = torch.norm(total_velocity, dim=1).unsqueeze(1)
                 # total_velocity_scaled = nominal_velocity_norm * total_velocity / total_velocity_norm

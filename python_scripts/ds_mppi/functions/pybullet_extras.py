@@ -64,8 +64,9 @@ class KernelManager:
             self.pb.removeUserDebugItem(line)
 
     def delete_kernels(self):
-        for kernel in self.kernels:
-            self.delete_lines(kernel)
+        self.pb.removeAllUserDebugItems()
+        # for kernel in self.kernels:
+        #     self.delete_lines(kernel)
         self.kernels = []
 
     def update_kernels(self, policy_data, key='kernel_fk'):
