@@ -67,8 +67,8 @@ class TensorPolicyMPPI:
         self.alpha_tmp[:, :self.n_kernels] = self.alpha_tmp[:, :self.n_kernels].normal_(mean=0, std=self.alpha_s) \
                                                 + self.alpha_c[:self.n_kernels]
 
-        self.alpha_tmp[:, :self.n_kernels, 0] = 0 ## important to nullify the first component of alpha (currently doing it in MPPI.py)
-        # normalize alpha, as they must represent a vector
+        # self.alpha_tmp[:, :self.n_kernels, 0] = 0 ## important to nullify the first component of alpha (currently also doing it in MPPI.py)
+        # normalize alpha, as they should represent a vector (hinders performance as it interferes with sampling exploration)
         # self.alpha_tmp[:, :self.n_kernels] = self.alpha_tmp[:, :self.n_kernels] / \
         #                                     torch.norm(self.alpha_tmp[:, :self.n_kernels], dim=2, keepdim=True)
         # self.alpha_tmp[:, :self.n_kernels] = torch.nan_to_num(self.alpha_tmp[:, :self.n_kernels])

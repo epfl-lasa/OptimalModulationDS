@@ -149,9 +149,9 @@ class MPPI:
                 #### important to nullify first component (to ensure tangential motion)
                 # P.alpha_tmp[:, 0:P.n_kernels, 0] = 0
                 #### that's for kernel gamma(q_k) policy
-                policy_all_flows = (P.kernel_obstacle_bases[0:P.n_kernels] @ P.alpha_tmp[:, 0:P.n_kernels].unsqueeze(3)).squeeze(-1)
+                #policy_all_flows = (P.kernel_obstacle_bases[0:P.n_kernels] @ P.alpha_tmp[:, 0:P.n_kernels].unsqueeze(3)).squeeze(-1)
                 #### disable tangential stuff, optimize just some vector field
-                # policy_all_flows = P.alpha_tmp[:, 0:P.n_kernels].squeeze()
+                policy_all_flows = P.alpha_tmp[:, 0:P.n_kernels]
                 #### that's for local gamma(q) policy
                 # policy_all_flows = torch.matmul(E[:, None], P.alpha_tmp[:, 0:P.n_kernels].unsqueeze(3)).squeeze(-1)
 
