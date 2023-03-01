@@ -67,7 +67,7 @@ def main_loop():
     # kernel adding thresholds
     dst_thr = config['planner']['kernel_adding_collision_thr']       # distance to collision (everything below - adds a kernel)
     thr_rbf_add = config['planner']['kernel_adding_kernels_thr']   # distance to closest kernel (l2 norm of 7d vector difference)
-
+    thr_dot_add = config['planner']['kernel_adding_dotproduct_thr']       # dot product between ds and obstacle normal
     # [ZMQ] Receive obstacles
     obs = zmq_init_recv(socket_receive_obs)
     #primary MPPI to sample naviagtion policy
@@ -108,7 +108,7 @@ def main_loop():
         # Propagate modulated DS
         # print(f'Init state: {mppi.q_cur}')
         with record_function("TAG: general propagation"):
-            all_traj, closests_dist_all, kernel_val_all = mppi.propagate()
+            all_traj, closests_dist_all, kernel_val_all, dotproducts_all = mppi.propagate()
 
         with record_function("TAG: cost calculation"):
             # Calculate cost
@@ -118,7 +118,7 @@ def main_loop():
             mppi.shift_policy_means()
 
         # Check trajectory for new kernel candidates and add policy kernels
-        kernel_candidates = mppi.Policy.check_traj_for_kernels(all_traj, closests_dist_all, dst_thr - mppi.dst_thr, thr_rbf_add)
+        kernel_candidates = mppi.Policy.check_traj_for_kernels(all_traj, closests_dist_all, dotproducts_all, dst_thr - mppi.dst_thr, thr_rbf_add, thr_dot_add)
 
         if len(kernel_candidates) > 0:
             rand_idx = torch.randint(kernel_candidates.shape[0], (1,))[0]

@@ -26,12 +26,12 @@ zmq:
 planner:
   # sampling params
   n_trajectories: 100
-  horizon: 10
-  dt: 0.5
+  horizon: 20
+  dt: 0.2
   collision_threshold: 0.01
 
   # navigation kernel params
-  kernel_width: 0.5
+  kernel_width: 0.25
   kernel_p: 2
   alpha_sampling_sigma: 3
   policy_update_rate: 0.5
@@ -39,7 +39,8 @@ planner:
   update_kernel_bases: False # change tangential basis (may be useful for moving obstacles)
 
   # navigation kernel adding params
-  kernel_adding_collision_thr: 0.01
+  kernel_adding_collision_thr: 0.03
+  kernel_adding_dotproduct_thr: 0.9
   kernel_adding_kernels_thr: 0.3 #(rbf value, lower it is - sparser the kernels - depends on kernel_width a lot)
 
 integrator:

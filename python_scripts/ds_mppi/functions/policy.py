@@ -69,9 +69,9 @@ class TensorPolicyMPPI:
 
         self.alpha_tmp[:, :self.n_kernels, 0] = 0 ## important to nullify the first component of alpha (currently doing it in MPPI.py)
         # normalize alpha, as they must represent a vector
-        self.alpha_tmp[:, :self.n_kernels] = self.alpha_tmp[:, :self.n_kernels] / \
-                                            torch.norm(self.alpha_tmp[:, :self.n_kernels], dim=2, keepdim=True)
-        self.alpha_tmp[:, :self.n_kernels] = torch.nan_to_num(self.alpha_tmp[:, :self.n_kernels])
+        # self.alpha_tmp[:, :self.n_kernels] = self.alpha_tmp[:, :self.n_kernels] / \
+        #                                     torch.norm(self.alpha_tmp[:, :self.n_kernels], dim=2, keepdim=True)
+        # self.alpha_tmp[:, :self.n_kernels] = torch.nan_to_num(self.alpha_tmp[:, :self.n_kernels])
     def update_policy(self, w, upd_rate, update_mask=None):
         # Update policy parameters, use current state(mu_c, sigma_c and alpha_c)
         # and a sampled policy (mu_tmp, sigma_tmp, alpha_tmp) with weights w
@@ -137,7 +137,7 @@ class TensorPolicyMPPI:
         else:
             print('Not adding new kernel at: maximum number of kernels reached', q)
 
-    def check_traj_for_kernels(self, all_traj, closests_dist_all, thr_dist, thr_kernel):
+    def check_traj_for_kernels(self, all_traj, closests_dist_all, dotproducts_all, thr_dist, thr_kernel, thr_dot):
         # Check if a trajectory has encountered an obstacle
         # If yes, output this position as potential kernel center
         # all_traj: all trajectories
@@ -145,7 +145,8 @@ class TensorPolicyMPPI:
         # return: potential kernel centers
         # check if any point of any trajectory is close to an obstacle
         idx_close = closests_dist_all < thr_dist
-        close_candidates = all_traj[idx_close].view(-1, self.n_dof)
+        idx_dotproduct = dotproducts_all < thr_dot
+        close_candidates = all_traj[idx_close * idx_dotproduct].view(-1, self.n_dof)
         # then check if any of these points is far from a kernel
         if self.n_kernels > 0:
             rbf_val_candidates = eval_rbf_simple(close_candidates, self.mu_c[0:self.n_kernels], self.sigma_c[0:self.n_kernels], self.p)

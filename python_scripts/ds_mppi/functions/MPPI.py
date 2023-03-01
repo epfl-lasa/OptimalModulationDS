@@ -43,6 +43,8 @@ class MPPI:
         self.D = (torch.zeros([self.N_traj, self.n_dof, self.n_dof]) + torch.eye(self.n_dof)).to(**self.tensor_args)
         self.nn_grad = torch.zeros(N_traj, self.n_dof).to(**self.tensor_args)
         self.norm_basis = torch.zeros((self.N_traj, dt_H, self.n_dof, self.n_dof)).to(**self.tensor_args)
+        self.dot_products = torch.zeros((self.N_traj, dt_H)).to(**self.tensor_args)
+
         self.basis_eye = torch.eye(self.n_dof).repeat(N_traj, 1).reshape(N_traj, self.n_dof, self.n_dof).to(**self.tensor_args).cpu()
         self.basis_eye_temp = (self.basis_eye * 0).to(**self.tensor_args).cpu()
         self.nn_model.allocate_gradients(self.N_traj+self.Policy.N_KERNEL_MAX, self.tensor_args)
@@ -59,7 +61,7 @@ class MPPI:
 
         for tmp in range(5):
             self.Policy.sample_policy()
-            _, _, _ = self.propagate()
+            _, _, _, _ = self.propagate()
             numeric_fk_model(self.q_cur, dh_params, 10)
             print(f'warmup run #{tmp+1} done')
 
@@ -67,7 +69,7 @@ class MPPI:
         self.all_traj = self.all_traj * 0
         self.closest_dist_all = 100 + self.closest_dist_all * 0
         self.kernel_val_all = self.kernel_val_all * 0
-
+        self.dot_products = self.dot_products * 0
     def build_nn_input(self, q_tens, obs_tens):
         self.nn_input = torch.hstack((q_tens.tile(obs_tens.shape[0], 1), obs_tens.repeat_interleave(q_tens.shape[0], 0)))
         return self.nn_input
@@ -76,7 +78,7 @@ class MPPI:
         self.reset_tensors()
         self.all_traj[:, 0, :] = self.q_cur
         P = self.Policy
-        for i in range(1, self.dt_H):
+        for i in range(1, self.dt_H+1):
             with record_function("TAG: Nominal vector field"):
                 q_prev = self.all_traj[:, i - 1, :]
                 # calculate nominal vector field
@@ -105,6 +107,7 @@ class MPPI:
                 self.norm_basis[:, i-1] = E
 
                 dotproduct = (E[:, :, 0] * nominal_velocity_normalized).sum(dim=-1)
+                self.dot_products[:, i-1] = dotproduct
                 l_vel = generalized_sigmoid(dotproduct, 0, 1, 0.3, 0.5, 100)
             with record_function("TAG: Modulation-propagation"):
                 # calculate standard modulation coefficients
@@ -121,8 +124,8 @@ class MPPI:
                     k_sigmoid = 3
                 else:
                     # for franka robot (meters)
-                    dist_low, dist_high = 0.01, 0.1
-                    k_sigmoid = 100
+                    dist_low, dist_high = 0.05, 0.1
+                    k_sigmoid = 200
                 ln_min, ln_max = 0, 1
                 ltau_min, ltau_max = 1, 3
                 l_n = generalized_sigmoid(distance, ln_min, ln_max, dist_low, dist_high, k_sigmoid)
@@ -146,17 +149,20 @@ class MPPI:
                 #### important to nullify first component (to ensure tangential motion)
                 # P.alpha_tmp[:, 0:P.n_kernels, 0] = 0
                 #### that's for kernel gamma(q_k) policy
-                # policy_all_flows = (P.kernel_obstacle_bases[0:P.n_kernels] @ P.alpha_tmp[:, 0:P.n_kernels].unsqueeze(3)).squeeze()
+                policy_all_flows = (P.kernel_obstacle_bases[0:P.n_kernels] @ P.alpha_tmp[:, 0:P.n_kernels].unsqueeze(3)).squeeze(-1)
                 #### disable tangential stuff, optimize just some vector field
                 # policy_all_flows = P.alpha_tmp[:, 0:P.n_kernels].squeeze()
                 #### that's for local gamma(q) policy
-                policy_all_flows = torch.matmul(E[:, None], P.alpha_tmp[:, 0:P.n_kernels].unsqueeze(3)).squeeze(-1)
+                # policy_all_flows = torch.matmul(E[:, None], P.alpha_tmp[:, 0:P.n_kernels].unsqueeze(3)).squeeze(-1)
 
-                # sum weighted inputs from kernels
+                # sum weighted inputs from kernels #### BUG HERE!!!!
                 policy_value = torch.sum(policy_all_flows * self.ker_w, 1)
+                # for one kernel policy_all_flows [100, 7], ker_w [100, 1, 1]
+                # valid multiplication
                 if P.n_kernels > 0:
                     self.kernel_val_all[:, i - 1, 0:P.n_kernels] = kernel_value.reshape((self.N_traj, P.n_kernels))
-
+                if P.n_kernels == 0:
+                    policy_value = nominal_velocity * 0
             with record_function("TAG: Apply policy"):
                 # policy control
                 ### policy depends on kernel Gamma(q_k) - assuming matrix multiplication done above
@@ -188,10 +194,11 @@ class MPPI:
                 mod_velocity[distance < 0] += repulsion_velocity[distance < 0]
             with record_function("TAG: Propagate"):
                 # propagate
-                self.all_traj[:, i, :] = self.all_traj[:, i - 1, :] + self.dt * mod_velocity
+                if i < self.dt_H:
+                    self.all_traj[:, i, :] = self.all_traj[:, i - 1, :] + self.dt * mod_velocity
                 if i == 1:
                     self.qdot = mod_velocity
-        return self.all_traj, self.closest_dist_all, self.kernel_val_all[:, :, 0:P.n_kernels]
+        return self.all_traj, self.closest_dist_all, self.kernel_val_all[:, :, 0:P.n_kernels], self.dot_products
 
 
     def distance_repulsion_nn(self, q_prev, aot=False):
