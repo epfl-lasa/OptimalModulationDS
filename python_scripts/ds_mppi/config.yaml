@@ -40,7 +40,7 @@ planner:
 
   # navigation kernel adding params
   kernel_adding_collision_thr: 0.03
-  kernel_adding_dotproduct_thr: 0.9
+  kernel_adding_dotproduct_thr: -0.9
   kernel_adding_kernels_thr: 0.3 #(rbf value, lower it is - sparser the kernels - depends on kernel_width a lot)
 
 integrator:
