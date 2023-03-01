@@ -58,6 +58,20 @@ def main_loop():
     ring[:, 3] = 0.03
 
     ########################################
+    ### line/wall
+    ########################################
+    posA = torch.tensor([0.3, 0.0, 0.75, 0.05])
+    posB = torch.tensor([0.7, 0.0, 0.75, 0.05])
+    n_pts = 10
+    line = posA + torch.linspace(0, 1, n_pts).reshape(-1, 1) * (posB - posA)
+    wall = line
+    n_down = 5
+    height = 0.3
+    for sphere in line:
+        sphere_down = sphere - torch.tensor([0, 0, height, 0])
+        line_down = sphere + torch.linspace(0, 1, n_down).reshape(-1, 1) * (sphere_down - sphere)
+        wall = torch.vstack((wall, line_down))
+    ########################################
     ### Dummy obstacle
     ########################################
     # n_dummy = 1
@@ -66,7 +80,7 @@ def main_loop():
 
     N_ITER = 0
     freq = config["obstacle_streamer"]["frequency"]
-    amplitude_array = torch.tensor([[0.0, 0.0, 0.1, 0],
+    amplitude_array = torch.tensor([[0.0, 0.0, 0.0, 0],
                                     [0.0, 0.0, 0.0, 0]])
     period_array = [2, 2]
     t_0 = time.time()
@@ -76,6 +90,10 @@ def main_loop():
             obs = ring
         elif config["collision_model"]["obstacle"] == 'tshape':
             obs = tshape
+        elif config["collision_model"]["obstacle"] == 'wall':
+            obs = wall
+        elif config["collision_model"]["obstacle"] == 'line':
+            obs = line
         else:
             obs = torch.tensor([[0.3, 0.0, 0.0, 0.01]])
         t_run = time.time() - t_0
