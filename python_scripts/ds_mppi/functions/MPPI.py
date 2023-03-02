@@ -41,6 +41,8 @@ class MPPI:
         self.q_cur = q0
         self.nn_input = torch.zeros(N_traj * obs.shape[0], self.n_dof + 3).to(**self.tensor_args)
         self.D = (torch.zeros([self.N_traj, self.n_dof, self.n_dof]) + torch.eye(self.n_dof)).to(**self.tensor_args)
+        self.D_tau = (torch.zeros([self.N_traj, self.n_dof, self.n_dof]) + torch.eye(self.n_dof)).to(**self.tensor_args)
+        self.D_tau[:, 0, 0] = 0
         self.nn_grad = torch.zeros(N_traj, self.n_dof).to(**self.tensor_args)
         self.norm_basis = torch.zeros((self.N_traj, dt_H, self.n_dof, self.n_dof)).to(**self.tensor_args)
         self.dot_products = torch.zeros((self.N_traj, dt_H)).to(**self.tensor_args)
@@ -141,22 +143,21 @@ class MPPI:
             # apply policies
             with record_function("TAG: Apply policies"):
                 kernel_value = eval_rbf(q_prev, P.mu_tmp[:, 0:P.n_kernels], P.sigma_tmp[:, 0:P.n_kernels], P.p)
-                # kernel_value[kernel_value < self.ker_thr] = 0
-                # ker_w = torch.exp(50*kernel_value)
-                # ker_w[kernel_value < self.ker_thr] = 0
-                # self.ker_w = torch.nan_to_num(ker_w / torch.sum(ker_w, 1).unsqueeze(1)) #normalize kernel influence
                 self.ker_w = kernel_value
                 #### important to nullify first component (to ensure tangential motion)
                 # P.alpha_tmp[:, 0:P.n_kernels, 0] = 0
                 #### that's for kernel gamma(q_k) policy
                 #policy_all_flows = (P.kernel_obstacle_bases[0:P.n_kernels] @ P.alpha_tmp[:, 0:P.n_kernels].unsqueeze(3)).squeeze(-1)
-                #### disable tangential stuff, optimize just some vector field
-                policy_all_flows = P.alpha_tmp[:, 0:P.n_kernels]
                 #### that's for local gamma(q) policy
                 # policy_all_flows = torch.matmul(E[:, None], P.alpha_tmp[:, 0:P.n_kernels].unsqueeze(3)).squeeze(-1)
+                #### disable tangential stuff, optimize just 7d vector field
+                policy_all_flows = P.alpha_tmp[:, 0:P.n_kernels]
 
                 # sum weighted inputs from kernels #### BUG HERE [FIXED FINALLY]!!!!
                 policy_value = torch.sum(policy_all_flows * self.ker_w, 1)
+                ## project it to tangent space (if needed)
+                M_tau = E @ self.D_tau @ E.transpose(1, 2)
+                policy_value = (M_tau @ policy_value.unsqueeze(-1)).squeeze(-1)
                 # for one kernel policy_all_flows [100, 7], ker_w [100, 1, 1]
                 # valid multiplication
                 if P.n_kernels > 0:

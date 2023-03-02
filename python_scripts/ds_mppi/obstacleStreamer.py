@@ -60,13 +60,14 @@ def main_loop():
     ########################################
     ### line/wall
     ########################################
-    posA = torch.tensor([0.3, 0.0, 0.75, 0.05])
-    posB = torch.tensor([0.7, 0.0, 0.75, 0.05])
+    height = 1
+    length = 0.5
+    posA = torch.tensor([0.25, 0.0, height, 0.05])
+    posB = posA + torch.tensor([length, 0.0, 0.0, 0.0])
     n_pts = 10
     line = posA + torch.linspace(0, 1, n_pts).reshape(-1, 1) * (posB - posA)
     wall = line
-    n_down = 5
-    height = 0.3
+    n_down = 10
     for sphere in line:
         sphere_down = sphere - torch.tensor([0, 0, height, 0])
         line_down = sphere + torch.linspace(0, 1, n_down).reshape(-1, 1) * (sphere_down - sphere)

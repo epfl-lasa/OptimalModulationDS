@@ -71,11 +71,11 @@ class TensorPolicyMPPI:
         self.alpha_tmp[:, :self.n_kernels] = self.alpha_tmp[:, :self.n_kernels].normal_(mean=0, std=self.alpha_s) \
                                                 + self.alpha_c[:self.n_kernels]
         #inject rest pose reaching
-        if self.n_traj > 5:
-            self.alpha_tmp[0, :self.n_kernels] = -(self.mu_c[:self.n_kernels] - self.rest)
-            self.alpha_tmp[1, :self.n_kernels] = -2*(self.mu_c[:self.n_kernels] - self.rest)
-            self.alpha_tmp[2, :self.n_kernels] = -5*(self.mu_c[:self.n_kernels] - self.rest)
-            self.alpha_tmp[3, :self.n_kernels] = -10*(self.mu_c[:self.n_kernels] - self.rest)
+        # if self.n_traj > 5:
+        #     self.alpha_tmp[0, :self.n_kernels] = -(self.mu_c[:self.n_kernels] - self.rest)
+        #     self.alpha_tmp[1, :self.n_kernels] = -2*(self.mu_c[:self.n_kernels] - self.rest)
+        #     self.alpha_tmp[2, :self.n_kernels] = -5*(self.mu_c[:self.n_kernels] - self.rest)
+        #     self.alpha_tmp[3, :self.n_kernels] = -10*(self.mu_c[:self.n_kernels] - self.rest)
 
         # self.alpha_tmp[:, :self.n_kernels, 0] = 0 ## important to nullify the first component of alpha (currently also doing it in MPPI.py)
         # normalize alpha, as they should represent a vector (hinders performance as it interferes with sampling exploration)
