@@ -6,7 +6,7 @@ import copy
 
 sys.path.append('../functions/')
 from MPPI import *
-sys.path.append('../mlp_learn/')
+sys.path.append('../../mlp_learn/')
 from sdf.robot_sdf import RobotSdfCollisionNet
 
 # define tensor parameters (cpu or cuda:0)
@@ -65,7 +65,7 @@ def main_int():
     dh_params = torch.vstack((dh_a * 0, dh_a * 0, dh_a, dh_a * 0)).T
     # Obstacle spheres (x, y, z, r)
     obs = torch.tensor([[6, 2, 0, .5],
-                        [4.5, -1, 0, .5],
+                        [2., -1, 0, .5],
                         [5, 0, 0, .5]]).to(**params)
     n_dummy = 1
     dummy_obs = torch.hstack((torch.zeros(n_dummy, 3)+6, torch.zeros(n_dummy, 1)+0.1)).to(**params)
@@ -78,34 +78,27 @@ def main_int():
     A = -1 * torch.diag(torch.ones(DOF)).to(**params) #nominal DS
     N_traj = 100                 # number of trajectories in exploration sampling
     dt_H = 10                   # horizon length in exploration sampling
-    dt = 0.2                    # integration timestep in exploration sampling
+    dt = 0.3                    # integration timestep in exploration sampling
     dt_sim = 0.1                # integration timestep for actual robot motion
 
     N_ITER = 0
     # kernel adding thresholds
     dst_thr = 0.5               # distance to collision (everything below - adds a kernel)
     thr_rbf_add = 0.05          # distance to closest kernel (l2 norm of 7d vector difference)
+    thr_dot_add = -0.9
 
     #primary MPPI to sample naviagtion policy
-    mppi = MPPI(q_0, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a, nn_model)
-    mppi.Policy.sigma_c_nominal = 1
-    mppi.Policy.alpha_s = 0.3
+    mppi = MPPI(q_0, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a, nn_model, 1)
+    mppi.Policy.sigma_c_nominal = 0.5
+    mppi.Policy.alpha_s = 0.75
     mppi.Policy.policy_upd_rate = 0.5
     mppi.dst_thr = dst_thr/2      # substracted from actual distance (added threshsold)
     mppi.ker_thr = 1e-3         # used to create update mask for policy means
 
     #set up second mppi to move the robot
-    mppi_step = MPPI(q_0, q_f, dh_params, obs, dt_sim, 2, 1, A, dh_a, nn_model)
+    mppi_step = MPPI(q_0, q_f, dh_params, obs, dt_sim, 1, 1, A, dh_a, nn_model, 1)
     mppi_step.Policy.alpha_s *= 0
 
-    # jit warmup
-    # for i in range(20):
-    #     _, _, _ = mppi.propagate()
-
-    #     _ = mppi.nn_model.model_jit.forward(torch.randn(N_traj*obs.shape[0], 10).to(**params))
-    #     _ = mppi.nn_model.model_jit_q.forward(torch.randn(N_traj*obs.shape[0], 10).to(**params))
-    #     _, _, _ = mppi.nn_model.dist_grad_closest(torch.randn(N_traj, 10).to(**params))
-    #     _, _, _ = mppi.nn_model.dist_grad_closest_aot(torch.randn(N_traj, 10).to(**params))
     best_idx = -1
     t0 = time.time()
     print('Init time: %4.2fs' % (t0 - t00))
@@ -122,7 +115,7 @@ def main_int():
             # Propagate modulated DS
 
             with record_function("TAG: general propagation"):
-                all_traj, closests_dist_all, kernel_val_all = mppi.propagate()
+                all_traj, closests_dist_all, kernel_val_all, dotproducts_all = mppi.propagate()
 
             with record_function("TAG: cost calculation"):
                 # Calculate cost
@@ -130,12 +123,24 @@ def main_int():
                 best_idx = torch.argmin(cost)
                 mppi.shift_policy_means()
             # Check trajectory for new kernel candidates and add policy kernels
-            kernel_candidates = mppi.Policy.check_traj_for_kernels(all_traj, closests_dist_all, dst_thr, thr_rbf_add)
+            kernel_candidates = mppi.Policy.check_traj_for_kernels(all_traj, closests_dist_all, dotproducts_all,
+                                                                   dst_thr - mppi.dst_thr, thr_rbf_add, thr_dot_add)
 
             if len(kernel_candidates) > 0:
-                rand_idx = torch.randint(kernel_candidates.shape[0], (1,))
-                mppi.Policy.add_kernel(kernel_candidates[rand_idx[0]])
-                kernel_fk, _ = numeric_fk_model(kernel_candidates[rand_idx[0]], dh_params, 10)
+                rand_idx = torch.randint(kernel_candidates.shape[0], (1,))[0]
+                closest_candidate_norm, closest_idx = torch.norm(kernel_candidates - mppi.q_cur, 2, -1).min(dim=0)
+                if closest_candidate_norm < 1e-1:
+                    idx_to_add = closest_idx
+                else:
+                    idx_to_add = rand_idx
+                candidate = kernel_candidates[idx_to_add]
+                # some mess to store the obstacle basis
+                idx_i, idx_h = torch.where((all_traj == candidate).all(dim=-1))
+                idx_i, idx_h = idx_i[0], idx_h[0]
+                # add the kernel finally
+                mppi.Policy.add_kernel(kernel_candidates[idx_to_add], closests_dist_all[idx_i, idx_h],
+                                       mppi.norm_basis[idx_i, idx_h].squeeze())
+                kernel_fk, _ = numeric_fk_model(kernel_candidates[idx_to_add], dh_params, 2)
                 upd_r_h(kernel_fk.to('cpu'), c_h[(mppi.Policy.n_kernels - 1) % len(c_h)])
 
             # Update current robot state
@@ -149,7 +154,7 @@ def main_int():
             mppi_step.Policy.n_kernels = mppi.Policy.n_kernels
             mppi_step.Policy.sample_policy()
             mppi_step.q_cur = copy.copy(mppi.q_cur)
-            _, _, _ = mppi_step.propagate()
+            _, _, _, _ = mppi_step.propagate()
             mppi.q_cur = mppi.q_cur + mppi_step.qdot[0, :] * dt_sim
             #print(mppi.qdot[best_idx, :] - mppi_step.qdot[0, :])
             cur_fk, _ = numeric_fk_model(mppi.q_cur, dh_params, 10)

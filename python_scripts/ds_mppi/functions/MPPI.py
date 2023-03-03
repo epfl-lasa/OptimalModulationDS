@@ -120,7 +120,7 @@ class MPPI:
                 # l_n[l_n < 0] = 0
                 # l_tau[l_tau < 1] = 1
                 # calculate own modulation coefficients
-                if 0:
+                if 1:
                     # for planar robot (units)
                     dist_low, dist_high = 0.5, 3
                     k_sigmoid = 3
@@ -157,7 +157,7 @@ class MPPI:
                 policy_value = torch.sum(policy_all_flows * self.ker_w, 1)
                 ## project it to tangent space (if needed)
                 M_tau = E @ self.D_tau @ E.transpose(1, 2)
-                policy_value = (M_tau @ policy_value.unsqueeze(-1)).squeeze(-1)
+                #policy_value = (M_tau @ policy_value.unsqueeze(-1)).squeeze(-1)
                 # for one kernel policy_all_flows [100, 7], ker_w [100, 1, 1]
                 # valid multiplication
                 if P.n_kernels > 0:
@@ -191,7 +191,7 @@ class MPPI:
                 mod_velocity = torch.nan_to_num(mod_velocity / mod_velocity_norm)
                 # slow down and repulsion for collision case
                 mod_velocity[distance < 0] *= 0.1
-                repulsion_velocity = E[:, :, 0] * nominal_velocity_norm
+                repulsion_velocity = E[:, :, 0] * nominal_velocity_norm*0.1
                 mod_velocity[distance < 0] += repulsion_velocity[distance < 0]
             with record_function("TAG: Propagate"):
                 # propagate
@@ -239,7 +239,7 @@ class MPPI:
                 nn_dist, nn_grad, nn_minidx = self.nn_model.dist_grad_closest(nn_input[:, 0:-1])
                 nn_grad = nn_grad.squeeze(2)
 
-            self.nn_grad = nn_grad[:, 0:self.n_dof]
+            self.nn_grad = nn_grad[:nn_input.shape[0], 0:self.n_dof]
             if self.nn_model.out_channels == 9:
                 nn_dist = nn_dist/100   # scale down to meters
 
