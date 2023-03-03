@@ -25,8 +25,8 @@ def trace_handler(profiler):
 # torch.cuda.manual_seed(0)
 def main_int():
     t00 = time.time()
-    DOF = 7
-    L = 1
+    DOF = 2
+    L = 3
 
     # Load nn model
     s = 256
@@ -65,7 +65,7 @@ def main_int():
     dh_params = torch.vstack((dh_a * 0, dh_a * 0, dh_a, dh_a * 0)).T
     # Obstacle spheres (x, y, z, r)
     obs = torch.tensor([[6, 2, 0, .5],
-                        [2., -1, 0, .5],
+                        [4.5, -1, 0, .5],
                         [5, 0, 0, .5]]).to(**params)
     n_dummy = 1
     dummy_obs = torch.hstack((torch.zeros(n_dummy, 3)+6, torch.zeros(n_dummy, 1)+0.1)).to(**params)
@@ -95,7 +95,8 @@ def main_int():
     mppi.dst_thr = dst_thr/2      # substracted from actual distance (added threshsold)
     mppi.ker_thr = 1e-3         # used to create update mask for policy means
     mppi.ignored_links = []
-
+    mppi.Cost.q_min = torch.tensor([-3.14, -3.14]).to(**params)
+    mppi.Cost.q_max = torch.tensor([3.14, 3.14]).to(**params)
     #set up second mppi to move the robot
     mppi_step = MPPI(q_0, q_f, dh_params, obs, dt_sim, 1, 1, A, dh_a, nn_model, 1)
     mppi_step.Policy.alpha_s *= 0

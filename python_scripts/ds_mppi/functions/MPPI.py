@@ -57,6 +57,8 @@ class MPPI:
         self.qdot = torch.zeros((self.N_traj, self.n_dof)).to(**self.tensor_args)
         self.ker_thr = 1e-3
         self.ignored_links = [0, 1, 2]
+        if self.n_dof <7:
+            self.ignored_links = []
         self.kernel_gammas_tmp = torch.zeros(self.Policy.N_KERNEL_MAX, **self.tensor_args)
         self.kernel_obstacle_bases_tmp = torch.zeros((self.Policy.N_KERNEL_MAX, self.n_dof, self.n_dof), **self.tensor_args)
         self.n_closest_obs = n_closest_obs
@@ -122,7 +124,7 @@ class MPPI:
                 # calculate own modulation coefficients
                 if 1:
                     # for planar robot (units)
-                    dist_low, dist_high = 0.5, 3
+                    dist_low, dist_high = 0.0, 2.5
                     k_sigmoid = 3
                 else:
                     # for franka robot (meters)
