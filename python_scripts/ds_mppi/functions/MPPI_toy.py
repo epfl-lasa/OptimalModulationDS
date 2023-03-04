@@ -1,5 +1,5 @@
 from policy import *
-from cost import *
+from cost_toy import *
 from fk_num import *
 from fk_sym_gen import *
 from math import pi
@@ -175,8 +175,8 @@ class MPPI:
                 goal_activation[goal_activation < 0.3] = 0
                 policy_velocity = collision_activation * velocity_activation * goal_activation * policy_value
                 # policy_velocity = velocity_activation * policy_value
-                if self.N_traj == 1:
-                    print(collision_activation.item(), velocity_activation.item())
+                # if self.N_traj == 1:
+                #     print(collision_activation.item(), velocity_activation.item())
                 #policy_velocity += ((1-l_n)/100).unsqueeze(1) * E[:, :, 0] #(some repuslion tweaking)
                 # calculate modulated vector field (and normalize)
 

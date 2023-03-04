@@ -20,7 +20,6 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.#
-from scipy.io import loadmat, savemat
 import torch
 import torch.nn.functional as F
 import numpy as np
@@ -32,13 +31,18 @@ import os
 import matplotlib.pyplot as plt
 from sdf.robot_sdf import RobotSdfCollisionNet
 
-device = torch.device('cuda', 0)
+device = torch.device('mps', 0)
 tensor_args = {'device': device, 'dtype': torch.float32}
-q_dof = 7
-data = torch.load('datasets/%d_dof_data.pt' % q_dof).to(**tensor_args)
-# data = data[0:20000]
-data_x = data[:, 0:q_dof + 3]
+# q_dof = 7
+# data = torch.load('datasets/%d_dof_data.pt' % q_dof).to(**tensor_args)
+q_dof = 2
+data = torch.load('datasets/2d_toy_data.pt').to(**tensor_args)
+
+# data = data[0:1000000]
+data_x = data[:, 0:q_dof + 2]
 data_y = data[:, -q_dof:]
+data_y = data[:, -1:] #2d toy
+
 n_size = data.shape[0]
 train_ratio = 0.98
 test_ratio = 0.001
@@ -61,7 +65,7 @@ y_test = data_y[idx_test, :]
 s = 256
 n_layers = 5
 skips = []
-fname = '%ddof_sdf_%dx%d_mesh.pt' % (q_dof, s, n_layers)
+fname = '%ddof_sdf_%dx%d_toy.pt' % (q_dof, s, n_layers)
 if skips == []:
     n_layers -= 1
 nn_model = RobotSdfCollisionNet(in_channels=x_train.shape[1], out_channels=y_train.shape[1], layers=[s] * n_layers,
