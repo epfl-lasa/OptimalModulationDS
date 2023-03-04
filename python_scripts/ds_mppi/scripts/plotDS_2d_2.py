@@ -51,6 +51,8 @@ r_sph = 1
 obs_arr = torch.vstack([c[0]+r_arc * torch.cos(t),
                         c[1]+r_arc * torch.sin(t),
                         r_sph*torch.ones(t.shape[0])]).transpose(0, 1)
+
+# obs_arr = np.linspace([4, 3, 0, 1], [4, -3, 0, 1], 10)
 obs_tens = torch.tensor(obs_arr).to(**params)
 
 # obs_tens = torch.tensor([[0, 2, 0, 1], [2, 1, 0, 2], [2, -1, 0, 2], [0, -2, 0, 1]]).to(**params)
@@ -84,38 +86,44 @@ ds_flow = A @ (q_tens - attractor).transpose(0, 1)
 # plt.plot(attractor[0], attractor[1], 'r*', markersize=10)
 #plt.show()
 
+N_ITER = 100
+N_TRAJ = 100
+H = 30
+dT = 0.1
 q_0 = torch.tensor([-5, 0]).to(**params)
-mppi_step = MPPI(q_0, attractor, torch.zeros(4, 4), obs_tens, 0.1, 1, 1, A, 0, nn_model, 5)
-ds_flow = torch.zeros(q_tens.shape).to(**params)
-for i, point in enumerate(q_tens):
-    mppi_step.q_cur = point
-    _, _, _, _ = mppi_step.propagate()
-    ds_flow[i] = mppi_step.qdot[0, :]
-    print(i)
-
-plt.streamplot(points_grid[0][:, 0].numpy(),
-               points_grid[1][0, :].numpy(),
-               ds_flow[:,0].reshape(n_mg, n_mg).numpy().T,
-               ds_flow[:,1].reshape(n_mg, n_mg).numpy().T,
-               density=2, color='b', linewidth=0.5, arrowstyle='->')
-
-trajs_init = np.linspace([-10,10], [-10, -10], 9)
-trajs = []
-
-mppi_traj = MPPI(q_0, attractor, torch.zeros(4, 4), obs_tens, 0.1, 1000, 1, A, 0, nn_model, 5)
-for point in trajs_init:
-    mppi_traj.q_cur = torch.tensor(point).to(**params)
-    traj, _, _, _ = mppi_traj.propagate()
-    trajs.append(traj)
-
-for traj in trajs:
-    plt.plot(traj[0][:, 0], traj[0][:, 1], color=[0.85, 0.32, 0.1], linewidth=1.5)
-plt.plot(attractor[0], attractor[1], 'r*', markersize=10)
-
-#finally place obstacles
-plt.contourf(points_grid[0], points_grid[1], distances, levels=1000, cmap=ListedColormap(carr), vmax=0.5)
-# contour zero lvl
-plt.contour(points_grid[0], points_grid[1], distances, levels=[0], colors='k')
-plt.gca().set_aspect('equal', adjustable='box')
-
-plt.show()
+mppi_step = MPPI(q_0, attractor, torch.zeros(4, 4), obs_tens, dT, N_TRAJ, H, A, 0, nn_model, 1)
+for i in range(N_ITER):
+    all_traj,
+# ds_flow = torch.zeros(q_tens.shape).to(**params)
+# for i, point in enumerate(q_tens):
+#     mppi_step.q_cur = point
+#     _, _, _, _ = mppi_step.propagate()
+#     ds_flow[i] = mppi_step.qdot[0, :]
+#     print(i)
+#
+# plt.streamplot(points_grid[0][:, 0].numpy(),
+#                points_grid[1][0, :].numpy(),
+#                ds_flow[:,0].reshape(n_mg, n_mg).numpy().T,
+#                ds_flow[:,1].reshape(n_mg, n_mg).numpy().T,
+#                density=2, color='b', linewidth=0.5, arrowstyle='->')
+#
+# trajs_init = np.linspace([-10,10], [-10, -10], 9)
+# trajs = []
+#
+# mppi_traj = MPPI(q_0, attractor, torch.zeros(4, 4), obs_tens, 0.1, 1000, 1, A, 0, nn_model, 1)
+# for point in trajs_init:
+#     mppi_traj.q_cur = torch.tensor(point).to(**params)
+#     traj, _, _, _ = mppi_traj.propagate()
+#     trajs.append(traj)
+#
+# for traj in trajs:
+#     plt.plot(traj[0][:, 0], traj[0][:, 1], color=[0.85, 0.32, 0.1], linewidth=1.5)
+# plt.plot(attractor[0], attractor[1], 'r*', markersize=10)
+#
+# #finally place obstacles
+# plt.contourf(points_grid[0], points_grid[1], distances, levels=1000, cmap=ListedColormap(carr), vmax=0.5)
+# # contour zero lvl
+# plt.contour(points_grid[0], points_grid[1], distances, levels=[0], colors='k')
+# plt.gca().set_aspect('equal', adjustable='box')
+#
+# plt.show()

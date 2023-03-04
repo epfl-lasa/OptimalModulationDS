@@ -34,7 +34,7 @@ def init_jpos_plot(xmin, xmax, ymin, ymax):
 def init_kernel_means(n_kernel_max):
     c_h = []
     for i in range(n_kernel_max):
-        tmp, = plt.plot([], [], '-o', color=[0, 0.60, 0.90], markersize=.1, linewidth=.2)
+        tmp, = plt.plot([], [], '-o', color=[0, 0.60, 0.90], markersize=2, linewidth=.2)
         c_h.append(tmp)
     return c_h
 
@@ -57,6 +57,10 @@ def upd_r_h(links, ln):
     plt.draw()
     return 0
 
+def upd_toy_h(coord, ln):
+    ln.set_data(coord[0], coord[1])
+    plt.draw()
+    return 0
 
 def plot_circ(c, r):
     # Plot a circle
@@ -70,7 +74,7 @@ def plot_circ(c, r):
 def plot_obs_init(obstacles):
     o_h = []
     for obstacle in obstacles:
-        o_h.append(plot_circ(obstacle[0:3], obstacle[3]))
+        o_h.append(plot_circ(obstacle[0:2], obstacle[-1]))
     return o_h
 
 
@@ -117,3 +121,18 @@ def upd_r_h3d(links, ln):
     ln.set_3d_properties(z_data)
     plt.draw()
     return 0
+
+
+def init_toy_plot(xmin, xmax, ymin, ymax):
+    # Initialize the robot plot
+    plt.ion()
+    fig = plt.figure(1)
+    ax = fig.add_subplot(111)
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_aspect('equal')
+    line_h, = plt.plot([], [], '*', color=[0, 0.4470, 0.7410], linewidth=5, markersize=5)
+    plt.show()
+    return line_h
