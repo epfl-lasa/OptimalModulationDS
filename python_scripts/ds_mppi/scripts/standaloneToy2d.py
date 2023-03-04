@@ -86,7 +86,7 @@ def main_int():
     mppi.Policy.alpha_s = 0.75
     mppi.Policy.policy_upd_rate = 0.5
     mppi.dst_thr = dst_thr/2      # substracted from actual distance (added threshsold)
-    mppi.ker_thr = 1e-3         # used to create update mask for policy means
+    mppi.ker_thr = 0.5         # used to create update mask for policy means
     mppi.ignored_links = []
     mppi.Cost.q_min = -10*torch.ones(DOF).to(**params)
     mppi.Cost.q_max =  10*torch.ones(DOF).to(**params)
@@ -164,6 +164,14 @@ def main_int():
         print(f'Iteration:{N_ITER:4d}, Time:{t_iter:4.2f}, Frequency:{1/t_iter:4.2f},',
               f' Avg. frequency:{N_ITER/(time.time()-t0):4.2f}',
               f' Kernel count:{mppi.Policy.n_kernels:4d}')
+        data = {'n_kernels': mppi.Policy.n_kernels,
+                'mu_c': mppi.Policy.mu_c[0:mppi.Policy.n_kernels],
+                'alpha_c': mppi.Policy.alpha_c[0:mppi.Policy.n_kernels],
+                'sigma_c': mppi.Policy.sigma_c[0:mppi.Policy.n_kernels],
+                'norm_basis': mppi.Policy.kernel_obstacle_bases[0:mppi.Policy.n_kernels]}
+        torch.save(data, 'toy_policy.pt')
+
+
     td = time.time() - t0
     print('Time: ', td)
     print('Time per iteration: ', td / N_ITER, 'Hz: ', 1 / (td / (N_ITER)))

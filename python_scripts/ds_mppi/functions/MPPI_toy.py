@@ -63,7 +63,7 @@ class MPPI:
         self.kernel_obstacle_bases_tmp = torch.zeros((self.Policy.N_KERNEL_MAX, self.n_dof, self.n_dof), **self.tensor_args)
         self.n_closest_obs = n_closest_obs
 
-        for tmp in range(5):
+        for tmp in range(1):
             self.Policy.sample_policy()
             _, _, _, _ = self.propagate()
             numeric_fk_model(self.q_cur, dh_params, 10)
@@ -174,6 +174,9 @@ class MPPI:
                 goal_activation = (q_prev-self.qf).norm(p=0.5, dim=1).clamp(0, 1).unsqueeze(1)
                 goal_activation[goal_activation < 0.3] = 0
                 policy_velocity = collision_activation * velocity_activation * goal_activation * policy_value
+                if P.n_kernels > 0:
+                    self.kernel_val_all[:, i - 1, 0:P.n_kernels] *= collision_activation * velocity_activation * goal_activation
+
                 # policy_velocity = velocity_activation * policy_value
                 # if self.N_traj == 1:
                 #     print(collision_activation.item(), velocity_activation.item())
@@ -316,6 +319,7 @@ class MPPI:
         update_mask = mean_kernel_activation_all > self.ker_thr
         print(f'Updating {sum(update_mask)} kernels!')
         self.Policy.update_policy(w, self.policy_upd_rate, update_mask)
+        print(update_mask)
         return 0
 
     def update_obstacles(self, obs):
