@@ -31,9 +31,15 @@ def main_loop():
     y_width = 0.4
     z_0 = 0.1
     height = 0.75
-    r = 0.05
-    n_vertical = 10
-    n_horizontal = 10
+    r = 0.03
+    n_vertical = 20
+    n_horizontal = 20
+
+    # small one
+    z_0 = 0.35
+    height = 0.4
+    y_width = 0.2
+    x_dist = 0.35
 
     top_left = torch.tensor([x_dist, -y_width, z_0+height, r])
     top_right = torch.tensor([x_dist, y_width, z_0+height, r])

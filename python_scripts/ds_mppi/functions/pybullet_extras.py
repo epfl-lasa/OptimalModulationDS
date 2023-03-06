@@ -8,11 +8,12 @@ class SphereManager:
         self.pb = pybullet_client
         self.spheres = []
         self.color = [.7, .1, .1, 1]
-
+        self.color = [.63, .07, .185, 1]
+        # self.color = [0.8500, 0.3250, 0.0980, 1]
     def create_sphere(self, position, radius, color):
         sphere = self.pb.createVisualShape(self.pb.GEOM_SPHERE,
                                            radius=radius,
-                                           rgbaColor=color)
+                                           rgbaColor=color, specularColor=[0, 0, 0, 1])
         sphere = self.pb.createMultiBody(baseVisualShapeIndex=sphere,
                                          basePosition=position)
         self.spheres.append(sphere)
@@ -42,8 +43,8 @@ class KernelManager:
     def __init__(self, pybullet_client):
         self.pb = pybullet_client
         self.kernels = []
-        self.color = [0, 1, 1]
-        self.width = 2
+        self.color = [0, 0.4470, 0.7410]
+        self.width = 3
 
     def create_line(self, positions):
         #draw a line

@@ -27,7 +27,7 @@ planner:
   # sampling params
   n_trajectories: 50
   horizon: 10
-  dt: 0.4
+  dt: 0.5
   collision_threshold: 0.01
 
   # navigation kernel params
