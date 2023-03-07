@@ -1,7 +1,7 @@
 collision_model:
   fname: "franka_collision_model.pt"
   closest_spheres: 5
-  obstacle: "tshape"
+  obstacle: "tshape1"
 
 general:
   # Initial state

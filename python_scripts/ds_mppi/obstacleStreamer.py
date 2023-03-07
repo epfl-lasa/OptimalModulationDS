@@ -31,15 +31,15 @@ def main_loop():
     y_width = 0.4
     z_0 = 0.1
     height = 0.75
-    r = 0.03
+    r = 0.05
     n_vertical = 20
     n_horizontal = 20
 
-    # small one
-    z_0 = 0.35
-    height = 0.4
-    y_width = 0.2
-    x_dist = 0.35
+    # # small one
+    # z_0 = 0.35
+    # height = 0.4
+    # y_width = 0.2
+    # x_dist = 0.35
 
     top_left = torch.tensor([x_dist, -y_width, z_0+height, r])
     top_right = torch.tensor([x_dist, y_width, z_0+height, r])
@@ -87,9 +87,9 @@ def main_loop():
 
     N_ITER = 0
     freq = config["obstacle_streamer"]["frequency"]
-    amplitude_array = torch.tensor([[0.0, 0.0, 0.0, 0],
-                                    [0.0, 0.0, 0.0, 0]])
-    period_array = [2, 2]
+    amplitude_array = torch.tensor([[0.0, 0.05, 0.0, 0],
+                                    [0.0, 0.0, 0.05, 0]])
+    period_array = [1, 0.5]
     t_0 = time.time()
     while True:
         config = read_yaml('config.yaml')
@@ -102,7 +102,7 @@ def main_loop():
         elif config["collision_model"]["obstacle"] == 'line':
             obs = line
         else:
-            obs = torch.tensor([[0.3, 0.0, 0.0, 0.01]])
+            obs = torch.tensor([[10.3, 0.0, 0.0, 0.01]])
         t_run = time.time() - t_0
         delta = obs * 0
         for i in range(len(amplitude_array)):
