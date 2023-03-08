@@ -25,8 +25,8 @@ def main_loop():
     p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
     p.configureDebugVisualizer(lightPosition=[5, 5, 5])
     p.setPhysicsEngineParameter(maxNumCmdPer1ms=1000)
-    p.resetDebugVisualizerCamera(cameraDistance=1.5, cameraYaw=110, cameraPitch=-10, cameraTargetPosition=[0, 0, 0.5])
-    # p.resetDebugVisualizerCamera(cameraDistance=1.3, cameraYaw=90, cameraPitch=0, cameraTargetPosition=[0, 0, 0.5])
+    #p.resetDebugVisualizerCamera(cameraDistance=1.5, cameraYaw=110, cameraPitch=-10, cameraTargetPosition=[0, 0, 0.5])
+    p.resetDebugVisualizerCamera(cameraDistance=1.5, cameraYaw=110, cameraPitch=-25, cameraTargetPosition=[0, 0, 0.5])
 
     p.setAdditionalSearchPath(pd.getDataPath())
     timeStep = 0.01
@@ -65,7 +65,6 @@ def main_loop():
     i = 0
     no_ker_upd = 0
     desired_frequency = config["simulator"]["max_frequency"]
-    screen_per_sec = 10
     while True:
         t_iter_begin = time.time()
         # [ZMQ] Receive obstacles

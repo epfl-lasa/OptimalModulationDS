@@ -28,33 +28,17 @@ def main_loop():
 
 
     ########################################
-    ### line/wall
-    ########################################
-    r = 0.05
-    n_pts = 4
-    length = max(1, 2*n_pts-2)*r
-    z0 = 0.8
-    x0 = 0.6
-    y0 = 0
-    posA = torch.tensor([x0, y0, z0+length, r])
-    posB = posA + torch.tensor([length, 0.0, 0.0, 0.0])
-    line = posA + torch.linspace(0, 1, n_pts).reshape(-1, 1) * (posB - posA)
-    wall = line
-    n_down = n_pts
-    for sphere in line:
-        sphere_down = sphere - torch.tensor([0, 0, length, 0])
-        line_down = sphere + torch.linspace(0, 1, n_down).reshape(-1, 1) * (sphere_down - sphere)
-        wall = torch.vstack((wall, line_down))
-    obs = wall
-
-    ########################################
     ### cross
     ########################################
     r = 0.05
-    n_pts = 3
+    n_pts = 2
     z0 = 0.9
     x0 = 0.3
     y0 = 0
+
+    #screen
+    z0 = 0.7
+    x0 = 0.5
     length = max(1, 2*n_pts - 2) * r
     center = torch.tensor([x0, y0, z0, r])
     top = center + torch.tensor([0, 0, length, 0])
