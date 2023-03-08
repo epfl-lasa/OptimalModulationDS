@@ -112,9 +112,9 @@ trajs_init = np.linspace([-10, 10], [-10, -10], 9)
 trajs = []
 
 mppi_traj = MPPI(q_0, attractor, torch.zeros(4, 4), obs_tens, 0.1, 1000, 1, A, 0, nn_model, 5)
-# mppi_traj.Policy.update_with_data(policy)
-# mppi_traj.Policy.alpha_s *= 0
-# mppi_traj.Policy.sample_policy()  # samples a new policy using planned means and sigmas
+mppi_traj.Policy.update_with_data(policy)
+mppi_traj.Policy.alpha_s *= 0
+mppi_traj.Policy.sample_policy()  # samples a new policy using planned means and sigmas
 for point in trajs_init:
     mppi_traj.q_cur = torch.tensor(point).to(**params)
     traj, _, _, _ = mppi_traj.propagate()
@@ -131,19 +131,24 @@ plt.contourf(points_grid[0], points_grid[1], distances, levels=1000, cmap=Listed
 # contour zero lvl
 plt.contour(points_grid[0], points_grid[1], distances, levels=[0], colors='k')
 
-# # visualize policy
-# kernel_values = kernel_values.reshape(n_mg, n_mg)
-# kernel_values[distances<0]  = 0
-# carr = np.linspace([.8, 1, .4, 1], [.46, .67, .18, 1], 256)
-# carr[0] = [1, 1, 1, 0]
-# plt.contourf(points_grid[0], points_grid[1], kernel_values,
-#              levels=1000, cmap=ListedColormap(carr), vmin=0.3, vmax=1)
-#
-# center = policy['mu_c']
-# k_c = center[0]
-# k_dir = policy['alpha_c'][0]
-# plt.plot(k_c[0], k_c[1], 'gh', markersize=5)
-# plt.arrow(k_c[0], k_c[1], k_dir[0], k_dir[1], color='g', width=0.1)
+if policy['mu_c'][0][0]<10:
+    # visualize policy
+    kernel_values = kernel_values.reshape(n_mg, n_mg)
+    kernel_values[distances<0]  = 0
+    carr = np.linspace([.8, 1, .4, 1], [.46, .67, .18, 1], 256)
+    carr[0] = [1, 1, 1, 0]
+    plt.contourf(points_grid[0], points_grid[1], kernel_values,
+                 levels=1000, cmap=ListedColormap(carr), vmin=0.3, vmax=1)
+    plt.contour(points_grid[0], points_grid[1], kernel_values, levels=[0.1], colors='g',
+                linewidths=1.5, linestyles='dashed')
+
+    center = policy['mu_c']
+    k_c = center[0]
+    k_dir = policy['alpha_c'][0]
+    plt.plot(k_c[0], k_c[1], 'gh', markersize=5)
+    plt.arrow(k_c[0], k_c[1], k_dir[0], k_dir[1], color='g', width=0.1)
 
 plt.plot(attractor[0], attractor[1], 'r*', markersize=10)
+plt.savefig('0.png', dpi = 600)
 plt.show()
+

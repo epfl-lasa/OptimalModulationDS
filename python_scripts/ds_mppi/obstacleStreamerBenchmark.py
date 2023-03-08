@@ -31,14 +31,14 @@ def main_loop():
     ### cross
     ########################################
     r = 0.05
-    n_pts = 2
+    n_pts = 7
     z0 = 0.9
     x0 = 0.3
     y0 = 0
 
-    #screen
-    z0 = 0.7
-    x0 = 0.5
+    # #screen
+    # z0 = 0.7
+    # x0 = 0.5
     length = max(1, 2*n_pts - 2) * r
     center = torch.tensor([x0, y0, z0, r])
     top = center + torch.tensor([0, 0, length, 0])
