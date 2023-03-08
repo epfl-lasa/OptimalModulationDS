@@ -17,7 +17,7 @@ class PandaSim():
         # print("offset=",offset)
         flags = self.bullet_client.URDF_ENABLE_CACHED_GRAPHICS_SHAPES
         table_rot = self.bullet_client.getQuaternionFromEuler([pi / 2, 0, pi])
-        self.bullet_client.loadURDF('LAB/lab.urdf', np.array([1.01, -0.28, 0.45]), table_rot, flags=flags)
+        # self.bullet_client.loadURDF('LAB/lab.urdf', np.array([1.01, -0.28, 0.45]), table_rot, flags=flags)
         #self.bullet_client.loadURDF('lab_table/table.urdf', np.array([-0.15, 0.02, -0.1]), table_rot, flags=flags)
         # self.bullet_client.loadURDF('plane.urdf', np.array([0, 0, 0]), np.array([0, 0, 0, 1]), flags=flags)
 

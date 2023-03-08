@@ -17,15 +17,17 @@ def main_loop():
         config = yaml.load(file, Loader=yaml.FullLoader)
 
 
-    p.connect(p.GUI, options='--background_color_red=0.5 --background_color_green=0.5' +
-                             ' --background_color_blue=0.5 --width=1600 --height=1000')
-    # p.connect(p.GUI, options='--background_color_red=0 --background_color_green=1' +
-    #                          ' --background_color_blue=0 --width=1000 --height=1000')
+    # p.connect(p.GUI, options='--background_color_red=0.5 --background_color_green=0.5' +
+    #                          ' --background_color_blue=0.5 --width=1600 --height=1000')
+    p.connect(p.GUI, options='--background_color_red=1 --background_color_green=1' +
+                             ' --background_color_blue=1 --width=1000 --height=1000')
 
     p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0)
     p.configureDebugVisualizer(lightPosition=[5, 5, 5])
     p.setPhysicsEngineParameter(maxNumCmdPer1ms=1000)
-    p.resetDebugVisualizerCamera(cameraDistance=1.2, cameraYaw=110, cameraPitch=-10, cameraTargetPosition=[0, 0, 0.5])
+    p.resetDebugVisualizerCamera(cameraDistance=1.5, cameraYaw=110, cameraPitch=-10, cameraTargetPosition=[0, 0, 0.5])
+    # p.resetDebugVisualizerCamera(cameraDistance=1.3, cameraYaw=90, cameraPitch=0, cameraTargetPosition=[0, 0, 0.5])
+
     p.setAdditionalSearchPath(pd.getDataPath())
     timeStep = 0.01
     p.setTimeStep(timeStep)
@@ -63,6 +65,7 @@ def main_loop():
     i = 0
     no_ker_upd = 0
     desired_frequency = config["simulator"]["max_frequency"]
+    screen_per_sec = 10
     while True:
         t_iter_begin = time.time()
         # [ZMQ] Receive obstacles
@@ -71,8 +74,8 @@ def main_loop():
 
         # [ZMQ] Receive policy from planner
         policy_data, policy_recv_status = zmq_try_recv(policy_data, socket_receive_policy)
-        if policy_recv_status and 1:
-            kernel_manager.update_kernels(policy_data, 'kernel_fk')
+        #if policy_recv_status and 1:
+            #kernel_manager.update_kernels(policy_data, 'kernel_fk')
             #trajectory_manager.delete_kernels() #also deletes navigation kernels
             #trajectory_manager.update_kernels(policy_data, 'best_traj_fk')
 
@@ -97,11 +100,12 @@ def main_loop():
         keyEvents = p.getKeyboardEvents()
         # take a screenshot if 'z' is pressed
         if ord('z') in keyEvents and keyEvents[ord('z')] == 1:
+        # if True:
             #get image from camera
-            h = 2000
-            w = 2000
-            k = 1
-            camera_data = p.getCameraImage(k*h, k*w, renderer=p.ER_BULLET_HARDWARE_OPENGL)
+            h = 1000
+            w = 1000
+            k = 3
+            camera_data = p.getCameraImage(k*h, k*w, renderer=p.ER_TINY_RENDERER, shadow=1, lightDirection=[5, 5, 5],)
             # save rgb image to file
             im = Image.fromarray(camera_data[2])
             im.save(f'screenshots/screen{int(time.time())}.png')

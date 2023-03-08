@@ -58,3 +58,5 @@ dkms.conf
 python_scripts/mlp_learn/sdf/__pycache__/*
 */__pycache__/*
 */.pytest_cache/*
+*/screenshots/*
+screenshots/*.png

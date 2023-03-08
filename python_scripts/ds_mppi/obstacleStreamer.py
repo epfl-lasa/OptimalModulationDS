@@ -1,8 +1,9 @@
-import yaml
-import zmq
+import yaml, sys
 import torch
 import time
 import numpy as np
+sys.path.append('functions/')
+from zmq_utils import *
 
 
 def read_yaml(fname):
@@ -20,10 +21,8 @@ def main_loop():
     ###            ZMQ SETUP             ###
     ########################################
     context = zmq.Context()
-    # socket to publish data to fast loop
-    socket_send_obs = context.socket(zmq.PUB)
-    socket_send_obs.bind("tcp://*:%d" % config["zmq"]["obstacle_port"])
-
+    # socket to publish obstacles
+    socket_send_obs = init_publisher(context, '*', config["zmq"]["obstacle_port"])
     ########################################
     ### I-Shape centered in front of franka
     ########################################
@@ -66,16 +65,19 @@ def main_loop():
     ########################################
     ### line/wall
     ########################################
-    height = 1
-    length = 0.5
-    posA = torch.tensor([0.25, 0.0, height, 0.05])
+    r = 0.05
+    n_pts = 2
+    length = max(1, 2*n_pts-2)*r
+    z0 = 0.8
+    x0 = 0.6
+    y0 = 0
+    posA = torch.tensor([x0, y0, z0+length, r])
     posB = posA + torch.tensor([length, 0.0, 0.0, 0.0])
-    n_pts = 10
     line = posA + torch.linspace(0, 1, n_pts).reshape(-1, 1) * (posB - posA)
     wall = line
-    n_down = 10
+    n_down = n_pts
     for sphere in line:
-        sphere_down = sphere - torch.tensor([0, 0, height, 0])
+        sphere_down = sphere - torch.tensor([0, 0, length, 0])
         line_down = sphere + torch.linspace(0, 1, n_down).reshape(-1, 1) * (sphere_down - sphere)
         wall = torch.vstack((wall, line_down))
     ########################################
@@ -87,9 +89,9 @@ def main_loop():
 
     N_ITER = 0
     freq = config["obstacle_streamer"]["frequency"]
-    amplitude_array = torch.tensor([[0.0, 0.05, 0.0, 0],
-                                    [0.0, 0.0, 0.05, 0]])
-    period_array = [1, 0.5]
+    amplitude_array = torch.tensor([[0.0, 0.0, 1.0, 0],
+                                    [0.0, 0.0, 0.0, 0]])
+    period_array = [40, 0.01]
     t_0 = time.time()
     while True:
         config = read_yaml('config.yaml')

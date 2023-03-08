@@ -81,12 +81,14 @@ def main_loop():
     ########################################
     for i in range(20):
         socket_send_state.send_pyobj(q_0)
-        time.sleep(0.1)
+        time.sleep(0.01)
     print('Init time: %4.2fs' % (time.time() - t00))
     des_freq = config['integrator']['desired_frequency']
     t0 = time.time()
     iter_traj = 0
     res_arr = []
+    t_traj_start = t0
+    fname = 'experiment_logs/log_'+time.strftime('%H:%M:%S-%d-%m-%y')+'.txt'
     while torch.norm(mppi_step.q_cur - q_f)+1 > 0.001:
         t_iter_start = time.time()
 
@@ -111,18 +113,38 @@ def main_loop():
         N_ITER_TOTAL += 1
         N_ITER_TRAJ += 1
 
+        status_msg = ''
+        t_traj = time.time() - t_traj_start
         if torch.norm(mppi_step.q_cur - q_f) < 0.1:
             mppi_step.q_cur = q_0
             socket_send_state.send_pyobj(mppi_step.q_cur)
-            print(f'Trajectory reached in {N_ITER_TRAJ} iterations.')
-            res_arr.append(N_ITER_TRAJ)
-            print(res_arr)
-            print(len(res_arr), np.mean(res_arr), np.std(res_arr))
+            status = f'1: Goal reached in {N_ITER_TRAJ:3d} iterations ({t_traj:4.2f} seconds). ' \
+                     f'Obs: {obstacles_data.shape[0]}, Top obs: {obstacles_data[0]}'
+            print(status)
+            # res_arr.append(N_ITER_TRAJ)
+            # print(res_arr)
+            # print(len(res_arr), np.mean(res_arr), np.std(res_arr))
 
             N_ITER_TRAJ = 0
             N_SUCCESS += 1
             time.sleep(1)
-        # print(q_cur)
+            t_traj_start = time.time()
+            with open(fname, "a") as myfile:
+                myfile.write(status+'\n')
+
+        if t_traj >= 10:
+            mppi_step.q_cur = q_0
+            socket_send_state.send_pyobj(mppi_step.q_cur)
+            status = f'0: Goal not reached in {N_ITER_TRAJ:3d} iterations ({t_traj:4.2f} seconds). ' \
+                     f'Obs: {obstacles_data.shape[0]}, Top obs: {obstacles_data[0]}'
+            print(status)
+            N_ITER_TRAJ = 0
+            N_SUCCESS += 1
+            time.sleep(1)
+            t_traj_start = time.time()
+            with open(fname, "a") as myfile:
+                myfile.write(status+'\n')
+
 
         t_iter_tmp = time.time() - t_iter_start
         #time.sleep(max(0.0, 1/des_freq - t_iter_tmp))
