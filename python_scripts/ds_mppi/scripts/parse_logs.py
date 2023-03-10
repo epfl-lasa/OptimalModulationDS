@@ -3,7 +3,7 @@ import numpy as np
 np.set_printoptions(precision=3, suppress=True)
 
 for i in [2, 3, 4, 5, 6, 7]:
-    with open("../experiment_logs/my_%d.txt"%i, "r") as f:
+    with open("../experiment_logs/storm_%d.txt"%i, "r") as f:
         data = f.read().replace('\n', '')
 
 
