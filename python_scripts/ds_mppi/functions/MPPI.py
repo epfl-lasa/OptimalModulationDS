@@ -20,19 +20,19 @@ def get_mindist(all_links, obs):
 
 class MPPI:
     def __init__(self, q0: torch.Tensor, qf: torch.Tensor, dh_params: torch.Tensor, obs: torch.Tensor, dt: float,
-             dt_H: int, N_traj: int, A: torch.Tensor, dh_a: torch.Tensor, nn_model, n_closest_obs):
+             dt_H: int, N_traj: int, DS, dh_a , nn_model, n_closest_obs):
         self.tensor_args = {'device': q0.device, 'dtype': q0.dtype}
         self.n_dof = q0.shape[0]
         self.Policy = TensorPolicyMPPI(N_traj, self.n_dof, self.tensor_args)
         self.q0 = q0
-        self.qf = qf
+        self.qf = DS.q_goal.squeeze()
         self.dh_params = dh_params
         self.obs = obs
         self.n_obs = obs.shape[0]
         self.dt = dt
         self.dt_H = dt_H
         self.N_traj = N_traj
-        self.A = A
+        self.DS = DS
         self.dh_a = dh_a
         self.nn_model = nn_model
         self.all_traj = torch.zeros(N_traj, dt_H, self.n_dof).to(**self.tensor_args)
@@ -69,6 +69,11 @@ class MPPI:
             numeric_fk_model(self.q_cur, dh_params, 10)
             print(f'warmup run #{tmp+1} done')
 
+    def reset_DS(self, DS):
+        self.DS = DS
+        self.qf = DS.q_goal.squeeze()
+        self.Cost = Cost(self.qf, self.dh_params)
+
     def reset_tensors(self):
         self.all_traj = self.all_traj * 0
         self.closest_dist_all = 100 + self.closest_dist_all * 0
@@ -86,7 +91,8 @@ class MPPI:
             with record_function("TAG: Nominal vector field"):
                 q_prev = self.all_traj[:, i - 1, :]
                 # calculate nominal vector field
-                nominal_velocity = (q_prev - self.qf) @ self.A
+                #nominal_velocity = (q_prev - self.qf) @ self.A
+                nominal_velocity = self.DS.get_velocity(q_prev)
                 nominal_velocity_norm = torch.norm(nominal_velocity, dim=1).reshape(-1, 1)
                 nominal_velocity_normalized = nominal_velocity / nominal_velocity_norm
 

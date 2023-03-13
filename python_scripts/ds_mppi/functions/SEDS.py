@@ -6,13 +6,15 @@ import time
 
 
 class SEDS:
-    def __init__(self, fname):
+    def __init__(self, fname, attr = None):
         self.dtype = torch.float32
         seds_data = loadmat(fname)
         self.Mu = torch.tensor(seds_data['Mu']).to(self.dtype)
         self.Sigma = torch.tensor(seds_data['Sigma']).to(self.dtype)
         self.Priors = torch.tensor(seds_data['Priors']).to(self.dtype)
-        self.xT = torch.tensor(seds_data['xT']).to(self.dtype)
+        self.q_goal = torch.tensor(seds_data['xT']).to(self.dtype)
+        if attr is not None:
+            self.q_goal = attr
         self.dof = int(self.Mu.shape[0]/2)
         self.n_gaussians = self.Sigma.shape[2]
         self.Sigma_inv = torch.zeros([self.dof, self.dof, self.n_gaussians]).to(self.dtype)
@@ -20,8 +22,8 @@ class SEDS:
         for i in range(self.n_gaussians):
             self.Sigma_inv[:, :, i] = torch.inverse(self.Sigma[:self.dof, :self.dof, i]).to(self.dtype)
             self.det[i] = torch.abs(torch.det(self.Sigma[:self.dof, :self.dof, i])).to(self.dtype)
-        self.seds_thr = 1e-8
-        self.lin_thr = 0.5
+        self.seds_thr = 1e-2
+        self.lin_thr = 1e-2
     def gaussPDF(self, Data, j):
         nbVar, nbData = Data.shape
         Data = Data.t() - self.Mu[:self.dof, j]
@@ -57,18 +59,21 @@ class SEDS:
         return y
 
     def get_velocity(self, x):
-        x_dif = x-self.xT
+        x_dif = x.transpose(-1, -2)-self.q_goal
         dst = x_dif.norm(p=2, dim=0).unsqueeze(-1)
+        far_from_target = (dst > self.lin_thr).squeeze()
         y = self.GMR(x_dif)
         y_norm = y.norm(p=2, dim=0).unsqueeze(-1)
-        y_lin = torch.diag(torch.ones(self.dof)) @ x_dif
+        y_lin = -1*torch.diag(torch.ones(self.dof)) @ x_dif
         y_lin_norm = y_lin.norm(p=2, dim=0).unsqueeze(-1)
-
+        if torch.sum(far_from_target) > 0:
+            y[:, far_from_target] = y[:, far_from_target] / y_norm[far_from_target]
+            y_lin[:, far_from_target] = y_lin[:, far_from_target] / y_lin_norm[far_from_target]
         weak_seds = (y_norm < self.seds_thr).squeeze()
-        far_from_target = (dst > self.lin_thr).squeeze()
-        y_lin[:, far_from_target] = self.seds_thr * y_lin[:, far_from_target] / y_lin_norm[far_from_target].t()
-        y[:, weak_seds & far_from_target] = y_lin[:, weak_seds & far_from_target]
-        return y[:self.dof, :]
+        if torch.sum(weak_seds & far_from_target) > 0:
+            y[:, weak_seds & far_from_target] = y_lin[:, weak_seds & far_from_target]
+            print('lin!')
+        return y[:self.dof, :].transpose(-2, -1)
 
 
 if __name__ == '__main__':
