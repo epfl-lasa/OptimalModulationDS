@@ -4,6 +4,8 @@ from MPPI import *
 import torch
 from zmq_utils import *
 import yaml
+from LinDS import *
+from SEDS import *
 
 sys.path.append('../mlp_learn/')
 from sdf.robot_sdf import RobotSdfCollisionNet
@@ -27,10 +29,6 @@ def main_loop():
     # socket to receive data from robot
     ip_pc = '128.178.145.79'
     socket_receive_robot = init_subscriber(context, ip_pc, 6969)
-
-    # socket to publish data to robot
-    socket_send_robot = init_publisher(context, '*', 6868)
-
 
     # socket to publish data to slow loop
     socket_send_state = init_publisher(context, '*', config["zmq"]["state_port"])
@@ -72,7 +70,9 @@ def main_loop():
     dh_params = torch.vstack((dh_d, dh_a*0, dh_a, dh_alpha)).T.to(**params)          # (d, theta, a (or r), alpha)
 
     # Integration parameters
-    A = -1 * torch.diag(torch.ones(DOF)).to(**params)
+    DS1 = LinDS(q_f)
+    DS2 = LinDS(q_0)
+    DS_ARRAY = [DS1, DS2]
     N_traj = config['integrator']['n_trajectories']
     dt_H = config['integrator']['horizon']
     dt_sim = config['integrator']['dt']
@@ -82,16 +82,13 @@ def main_loop():
     SLEEP_SUCCESS = 1
     #set up one-step one-trajectory mppi to move the robot
     n_closest_obs = config['collision_model']['closest_spheres']
-    mppi_step = MPPI(q_0, q_f, dh_params, obs, dt_sim, dt_H, N_traj, A, dh_a, nn_model, n_closest_obs)
+    mppi_step = MPPI(q_0, q_f, dh_params, obs, dt_sim, dt_H, N_traj, DS_ARRAY, dh_a, nn_model, n_closest_obs)
     mppi_step.dst_thr = config['integrator']['collision_threshold']   # subtracted from actual distance (added threshsold)
     mppi_step.Policy.alpha_s *= 0
 
     ########################################
     ###     RUN MPPI AND SIMULATE        ###
     ########################################
-    for i in range(20):
-        socket_send_state.send_pyobj(q_0)
-        time.sleep(0.01)
     print('Init time: %4.2fs' % (time.time() - t00))
     des_freq = config['integrator']['desired_frequency']
     t0 = time.time()
@@ -129,12 +126,22 @@ def main_loop():
             # dq_des = mppi_step.qdot[0, :] * 0
             q_des = mppi_step.q_cur + mppi_step.qdot[0, :] * dt_sim
             dq_des = mppi_step.qdot[0, :]
-            socket_send_state.send_pyobj(q_des)
-            socket_send_robot.send_pyobj([q_des, dq_des])
+            state_dict = {'q': q_des, 'dq': dq_des, 'ds_idx': mppi_step.DS_idx}
+            socket_send_state.send_pyobj(state_dict)
             N_ITER_TOTAL += 1
             N_ITER_TRAJ += 1
+            t_traj = time.time() - t_traj_start
+            if (torch.norm(mppi_step.q_cur - mppi_step.qf) < 0.1) and (N_ITER_TRAJ > 100):
+                print('Switching DS!!')
+                mppi_step.switch_DS_idx(N_SUCCESS % 2)
+                status = f'1: Goal reached in {N_ITER_TRAJ:3d} iterations ({t_traj:4.2f} seconds). ' \
+                         f'Obs: {obstacles_data.shape[0]}, Top obs: {obstacles_data[0]}'
+                print(status)
+                N_ITER_TRAJ = 0
+                N_SUCCESS += 1
+                time.sleep(0.5)
+                t_traj_start = time.time()
 
-            #time.sleep(max(0.0, 1/des_freq - t_iter_tmp))
             t_iter = time.time() - t_iter_start
             np.set_printoptions(precision=2, suppress=True)
             # print(f'Iteration: {N_ITER_TRAJ:4d}({N_ITER_TOTAL:4d} total), Time:{t_iter:4.2f}, Frequency:{1/t_iter:4.2f},',

@@ -68,7 +68,7 @@ def main_loop():
     r = 0.05
     n_pts = 2
     length = max(1, 2*n_pts-2)*r
-    z0 = 0.8
+    z0 = 0.5
     x0 = 0.6
     y0 = 0
     posA = torch.tensor([x0, y0, z0+length, r])
