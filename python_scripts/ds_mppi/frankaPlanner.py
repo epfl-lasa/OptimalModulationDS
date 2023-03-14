@@ -4,6 +4,8 @@ sys.path.append('functions')
 from MPPI import *
 from zmq_utils import *
 import torch
+from LinDS import *
+from SEDS import *
 
 sys.path.append('../mlp_learn/')
 from sdf.robot_sdf import RobotSdfCollisionNet
@@ -59,6 +61,10 @@ def main_loop():
 
     # Integration parameters
     A = -1 * torch.diag(torch.ones(DOF)).to(**params)
+    DS1 = LinDS(q_f)
+    DS2 = LinDS(q_0)
+    DS_ARRAY = [DS1, DS2]
+
     N_traj = config['planner']['n_trajectories']
     dt_H = config['planner']['horizon']
     dt = config['planner']['dt']
@@ -72,7 +78,7 @@ def main_loop():
     obs = zmq_init_recv(socket_receive_obs)
     #primary MPPI to sample naviagtion policy
     n_closest_obs = config['collision_model']['closest_spheres']
-    mppi = MPPI(q_0, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a, nn_model, n_closest_obs)
+    mppi = MPPI(q_0, q_f, dh_params, obs, dt, dt_H, N_traj, DS_ARRAY, dh_a, nn_model, n_closest_obs)
     mppi.Policy.sigma_c_nominal = config['planner']['kernel_width']
     mppi.Policy.alpha_s = config['planner']['alpha_sampling_sigma']
     mppi.Policy.policy_upd_rate = config['planner']['policy_update_rate']
@@ -87,15 +93,17 @@ def main_loop():
 
     print('Init time: %4.2fs' % (time.time() - t00))
     t0 = time.time()
-    while torch.norm(mppi.q_cur - q_f)+1 > 0.001:
+    while True:
         t_iter = time.time()
         # [ZMQ] Receive state from integrator
-        mppi.q_cur, state_recv_status = zmq_try_recv(mppi.q_cur, socket_receive_state)
-        if state_recv_status and (mppi.q_cur - q_0).norm().numpy() < 1e-6:
-            print('Resetting policy')
-            mppi.Policy.reset_policy()
-            all_kernel_fk = []
-
+        state_dict, state_recv_status = zmq_try_recv(mppi.q_cur, socket_receive_state)
+        if state_recv_status:
+            mppi.q_cur = state_dict['q']
+            if state_dict['ds_idx'] != mppi.DS_idx:
+                mppi.switch_DS_idx(state_dict['ds_idx'])
+                print('Resetting policy')
+                mppi.Policy.reset_policy()
+                all_kernel_fk = []
         # [ZMQ] Receive obstacles
         obstacles_data, obs_recv_status = zmq_try_recv(mppi.obs, socket_receive_obs)
         mppi.update_obstacles(obstacles_data)

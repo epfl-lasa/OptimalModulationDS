@@ -87,7 +87,9 @@ def main_loop():
             no_ker_upd = 0
             policy_data = None
         # [ZMQ] Receive state from integrator
-        state, state_recv_status = zmq_try_recv(state, socket_receive_state)
+        state_dict, state_recv_status = zmq_try_recv(state, socket_receive_state)
+        if state_recv_status:
+            state = state_dict['q']
         panda.set_joint_positions(state)
         p.stepSimulation()
         t_iter_end = time.time()

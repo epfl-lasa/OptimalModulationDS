@@ -64,11 +64,13 @@ def main_loop():
 
     # Integration parameters
     A = -1 * torch.diag(torch.ones(DOF)).to(**params)
-    DS = LinDS(q_f)
-    DS1 = SEDS('content/seds_sine10.mat', q_0.unsqueeze(1))
-    DS2 = SEDS('content/seds_sine10.mat', q_f.unsqueeze(1))
+    DS1 = LinDS(q_0)
+    DS2 = LinDS(q_f)
+    DS_ARRAY = [DS1, DS2]
+    # DS1 = SEDS('content/ds/seds_sine10.mat', q_0.unsqueeze(1))
+    # DS2 = SEDS('content/ds/seds_sine10.mat', q_f.unsqueeze(1))
 
-    q_f = DS.q_goal.squeeze()
+    q_f = DS1.q_goal.squeeze()
     N_traj = config['integrator']['n_trajectories']
     dt_H = config['integrator']['horizon']
     dt_sim = config['integrator']['dt']
@@ -78,16 +80,16 @@ def main_loop():
     SLEEP_SUCCESS = 1
     #set up one-step one-trajectory mppi to move the robot
     n_closest_obs = config['collision_model']['closest_spheres']
-    mppi_step = MPPI(q_0, q_f, dh_params, obs, dt_sim, dt_H, N_traj, DS, dh_a, nn_model, n_closest_obs)
+    mppi_step = MPPI(q_0, q_f, dh_params, obs, dt_sim, dt_H, N_traj, DS_ARRAY, dh_a, nn_model, n_closest_obs)
     mppi_step.dst_thr = config['integrator']['collision_threshold']   # subtracted from actual distance (added threshsold)
     mppi_step.Policy.alpha_s *= 0
 
     ########################################
     ###     RUN MPPI AND SIMULATE        ###
     ########################################
-    for i in range(20):
-        socket_send_state.send_pyobj(q_0)
-        time.sleep(0.01)
+    # for i in range(20):
+    #     socket_send_state.send_pyobj(q_0)
+    #     time.sleep(0.01)
     print('Init time: %4.2fs' % (time.time() - t00))
     des_freq = config['integrator']['desired_frequency']
     t0 = time.time()
@@ -111,9 +113,11 @@ def main_loop():
         mppi_step.q_cur = torch.clamp(mppi_step.q_cur, mppi_step.Cost.q_min, mppi_step.Cost.q_max)
         # [ZMQ] Send current state to planner
         q_des = mppi_step.q_cur
-        dq_des = mppi_step.qdot[0, :] * 0
+        dq_des = mppi_step.qdot[0, :]
 
-        socket_send_state.send_pyobj(q_des)
+        # [ZMQ] Send current state package
+        state_dict = {'q': q_des, 'dq': dq_des, 'ds_idx':mppi_step.DS_idx}
+        socket_send_state.send_pyobj(state_dict)
 
         N_ITER_TOTAL += 1
         N_ITER_TRAJ += 1
@@ -121,8 +125,10 @@ def main_loop():
         status_msg = ''
         t_traj = time.time() - t_traj_start
         if torch.norm(mppi_step.q_cur - mppi_step.qf) < 0.1:
-            mppi_step.q_cur = q_0
-            socket_send_state.send_pyobj(mppi_step.q_cur)
+            mppi_step.switch_DS_idx(N_SUCCESS % 2)
+
+            #mppi_step.q_cur = q_0
+            #socket_send_state.send_pyobj(mppi_step.q_cur)
             status = f'1: Goal reached in {N_ITER_TRAJ:3d} iterations ({t_traj:4.2f} seconds). ' \
                      f'Obs: {obstacles_data.shape[0]}, Top obs: {obstacles_data[0]}'
             print(status)
@@ -132,14 +138,15 @@ def main_loop():
 
             N_ITER_TRAJ = 0
             N_SUCCESS += 1
-            time.sleep(1)
+            #time.sleep(1)
             t_traj_start = time.time()
             # with open(fname, "a") as myfile:
             #     myfile.write(status+'\n')
 
         if t_traj >= 10:
             mppi_step.q_cur = q_0
-            socket_send_state.send_pyobj(mppi_step.q_cur)
+            mppi_step.switch_DS_idx(N_SUCCESS % 2)
+            #socket_send_state.send_pyobj(mppi_step.q_cur)
             status = f'0: Goal not reached in {N_ITER_TRAJ:3d} iterations ({t_traj:4.2f} seconds). ' \
                      f'Obs: {obstacles_data.shape[0]}, Top obs: {obstacles_data[0]}'
             print(status)
