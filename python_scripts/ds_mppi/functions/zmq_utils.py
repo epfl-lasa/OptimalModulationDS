@@ -23,11 +23,29 @@ def zmq_try_recv(val, socket):
         pass
     return val, status
 
+def zmq_try_recv_raw(val, socket):
+    status = 0
+    try:
+        val = socket.recv(flags=zmq.DONTWAIT)
+        status = 1
+    except:
+        pass
+    return val, status
+
 def init_subscriber(context, address, port):
     # socket to receive stuff
     socket = context.socket(zmq.SUB)
     socket.setsockopt(zmq.CONFLATE, 1)
     socket.connect("tcp://%s:%s" % (address, str(port)))
+    socket.setsockopt(zmq.SUBSCRIBE, b"")
+    return socket
+
+
+def init_subscriber_bind(context, address, port):
+    # socket to receive stuff
+    socket = context.socket(zmq.SUB)
+    socket.setsockopt(zmq.CONFLATE, 1)
+    socket.bind("tcp://%s:%s" % (address, str(port)))
     socket.setsockopt(zmq.SUBSCRIBE, b"")
     return socket
 

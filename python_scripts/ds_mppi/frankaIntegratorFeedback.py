@@ -112,6 +112,8 @@ def main_loop():
             if (robot_state is not None) and (robot_state - mppi_step.q_cur).norm(p=2, dim=-1) > 0.5:
                 print('resetting state to robot')
                 mppi_step.q_cur = robot_state
+            # if (robot_state is not None):
+            #     mppi_step.q_cur = robot_state
 
             # [ZMQ] Receive policy from planner
             policy_data, policy_recv_status = zmq_try_recv(policy_data, socket_receive_policy)
