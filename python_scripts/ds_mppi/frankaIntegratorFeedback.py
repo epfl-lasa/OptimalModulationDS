@@ -108,7 +108,11 @@ def main_loop():
         robot_state, robot_recv_status = zmq_try_recv(mppi_step.q_cur, socket_receive_robot)
         if robot_recv_status:
             print(robot_state)
-            mppi_step.q_cur = torch.tensor(robot_state).to(**params)
+            robot_state = torch.tensor(robot_state).to(**params)
+            if (robot_state is not None) and (robot_state - mppi_step.q_cur).norm(p=2, dim=-1) > 0.5:
+                print('resetting state to robot')
+                mppi_step.q_cur = robot_state
+
             # [ZMQ] Receive policy from planner
             policy_data, policy_recv_status = zmq_try_recv(policy_data, socket_receive_policy)
             mppi_step.Policy.update_with_data(policy_data)
@@ -126,6 +130,7 @@ def main_loop():
             # dq_des = mppi_step.qdot[0, :] * 0
             q_des = mppi_step.q_cur + mppi_step.qdot[0, :] * dt_sim
             dq_des = mppi_step.qdot[0, :]
+            mppi_step.q_cur = q_des
             state_dict = {'q': q_des, 'dq': dq_des, 'ds_idx': mppi_step.DS_idx}
             socket_send_state.send_pyobj(state_dict)
             N_ITER_TOTAL += 1

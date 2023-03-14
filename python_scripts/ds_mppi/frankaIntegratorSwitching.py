@@ -142,19 +142,6 @@ def main_loop():
             # with open(fname, "a") as myfile:
             #     myfile.write(status+'\n')
 
-        if t_traj >= 10:
-            mppi_step.q_cur = q_0
-            socket_send_state.send_pyobj(mppi_step.q_cur)
-            status = f'0: Goal not reached in {N_ITER_TRAJ:3d} iterations ({t_traj:4.2f} seconds). ' \
-                     f'Obs: {obstacles_data.shape[0]}, Top obs: {obstacles_data[0]}'
-            print(status)
-            N_ITER_TRAJ = 0
-            N_SUCCESS += 1
-            time.sleep(1)
-            t_traj_start = time.time()
-            # with open(fname, "a") as myfile:
-            #     myfile.write(status+'\n')
-
 
         t_iter_tmp = time.time() - t_iter_start
         #time.sleep(max(0.0, 1/des_freq - t_iter_tmp))
