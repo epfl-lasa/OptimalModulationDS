@@ -4,6 +4,9 @@ import numpy as np
 sys.path.append('functions/')
 from zmq_utils import *
 from optitrack_utils import *
+from copy import deepcopy
+from scipy.spatial.transform import Rotation as R
+import numpy as np
 
 def read_yaml(fname):
     with open(fname) as file:
@@ -113,6 +116,31 @@ def main_loop():
     human_dict = None
     n_dummy = 100
     obs = torch.hstack((torch.zeros(n_dummy, 3) + 10, torch.zeros(n_dummy, 1) + 0.05)).to(**params)
+
+    pos0 = torch.tensor([0.7, -0.5, 0.0])
+    rot0 = torch.tensor(R.from_euler('xyz', [0, 0, 90], degrees=True).as_matrix()).to(**params)
+    body_arr = [dict() for i in range(6)]
+    body_arr[0]['pos'] = torch.zeros(3) + pos0 + torch.tensor([0, 0, 0.4])
+    body_arr[0]['rot'] = rot0
+    body_arr[0]['id'] = 1002 # neck
+    body_arr[1]['pos'] = torch.zeros(3) + pos0
+    body_arr[1]['rot'] = rot0
+    body_arr[1]['id'] = 1003 # pelvis
+    body_arr[2]['pos'] = torch.zeros(3) + pos0 + torch.tensor([-0.4, -0.1, 0.5])
+    body_arr[2]['rot'] = rot0
+    body_arr[2]['id'] = 1004 # right elbow
+    body_arr[3]['pos'] = torch.zeros(3) + pos0 + torch.tensor([-0.4, -0.2, 0.75])
+    body_arr[3]['rot'] = rot0
+    body_arr[3]['id'] = 1005 # right wrist
+    body_arr[4]['pos'] = torch.zeros(3) + pos0 + torch.tensor([0.4, -0.1, 0.5])
+    body_arr[4]['rot'] = rot0
+    body_arr[4]['id'] = 1006 # left elbow
+    body_arr[5]['pos'] = torch.zeros(3) + pos0 + torch.tensor([0.4, -0.2, 0.75])
+    body_arr[5]['rot'] = rot0
+    body_arr[5]['id'] = 1007 # left wrist
+
+
+
     while True:
         moved = False
         t_run = time.time() - t_0
@@ -130,6 +158,7 @@ def main_loop():
                 n_sph = len(human_spheres)
                 if n_sph > 0:
                     obs = human_spheres
+        human_dict, obs = get_human_pos(deepcopy(body_arr), human_dict)
 
         socket_send_obs.send_pyobj(obs)
         time.sleep(1/freq)
