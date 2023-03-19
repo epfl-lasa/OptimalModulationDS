@@ -1,5 +1,7 @@
 import torch
 import matplotlib.pyplot as plt
+import matplotlib as mpl
+
 from matplotlib.colors import ListedColormap
 import sys
 import numpy as np
@@ -86,8 +88,8 @@ ds_flow = A @ (q_tens - attractor).transpose(0, 1)
 q_0 = torch.tensor([-5, 0]).to(**params)
 mppi_step = MPPI(q_0, attractor, torch.zeros(4, 4), obs_tens, 0.1, 1, 1, A, 0, nn_model, 5)
 policy = torch.load('toy_policy.pt')
-policy['alpha_c'] *=0
-policy['mu_c'] +=100
+# policy['alpha_c'] *=0
+# policy['mu_c'] +=100
 mppi_step.Policy.update_with_data(policy)
 mppi_step.Policy.alpha_s *= 0
 mppi_step.Policy.sample_policy()  # samples a new policy using planned means and sigmas
@@ -124,31 +126,49 @@ for traj in trajs:
     plt.plot(traj[0][:, 0], traj[0][:, 1], color=[0.85, 0.32, 0.1], linewidth=1.5)
 plt.gca().set_aspect('equal', adjustable='box')
 
-#finally place obstacles
-carr = np.linspace([.1, .1, 1, 1], [.5, .5, 1, 1], 256)
-carr[-1] = [1, 1, 1, 0]
-plt.contourf(points_grid[0], points_grid[1], distances, levels=1000, cmap=ListedColormap(carr), vmax=0)
-# contour zero lvl
-plt.contour(points_grid[0], points_grid[1], distances, levels=[0], colors='k')
 
 if policy['mu_c'][0][0]<10:
     # visualize policy
     kernel_values = kernel_values.reshape(n_mg, n_mg)
-    kernel_values[distances<0]  = 0
-    carr = np.linspace([.8, 1, .4, 1], [.46, .67, .18, 1], 256)
-    carr[0] = [1, 1, 1, 0]
-    plt.contourf(points_grid[0], points_grid[1], kernel_values,
-                 levels=1000, cmap=ListedColormap(carr), vmin=0.3, vmax=1)
-    plt.contour(points_grid[0], points_grid[1], kernel_values, levels=[0.1], colors='g',
-                linewidths=1.5, linestyles='dashed')
+    kernel_values[distances<0] = 0
+    kernel_values[kernel_values > 0.98] = 1
 
+    clr0 = np.array([1, 1, 1, 1])
+    clr2 = np.array([.46, .67, .18, 1])
+    nrange = 500
+    carr = np.linspace(clr0, clr2, nrange)
+    # carr = np.zeros((1000, 4))
+    # carr[:, 3] = 1
+    # carr[0:nrange] = np.linspace(clr0, clr2, nrange)
+    # carr[nrange:] = clr2
+
+    # scale_arr = 1/(1+np.exp(-np.linspace(-10, 100, nrange)))
+    # carr1 = np.linspace(clr0, clr2, nrange)
+    # carr2 = np.linspace(clr1, clr2, nrange)
+    # for i in range(nrange):
+    #     carr[i] = carr1[i]*(1-scale_arr[i]) + carr2[i]*(scale_arr[i])
+    plt.contourf(points_grid[0], points_grid[1], kernel_values,
+                 levels=nrange,
+                 cmap=ListedColormap(carr), vmin=0, vmax=1)
+    #add colorbar
+    plt.colorbar(ticks=[0, 0.25, 0.5, 0.75, 1])
+
+    # plt.contour(points_grid[0], points_grid[1], kernel_values, levels=[0.1], colors='g',
+    #             linewidths=1.5, linestyles='dashed')
     center = policy['mu_c']
     k_c = center[0]
     k_dir = policy['alpha_c'][0]
     plt.plot(k_c[0], k_c[1], 'gh', markersize=5)
     plt.arrow(k_c[0], k_c[1], k_dir[0], k_dir[1], color='g', width=0.1)
 
+#finally place obstacles
+carr_obs = np.linspace([.1, .1, 1, 1], [.5, .5, 1, 1], 256)
+carr_obs[-1] = [1, 1, 1, 0]
+plt.contourf(points_grid[0], points_grid[1], distances, levels=1000, cmap=ListedColormap(carr_obs), vmax=0)
+# contour zero lvl
+plt.contour(points_grid[0], points_grid[1], distances, levels=[0], colors='k')
+
 plt.plot(attractor[0], attractor[1], 'r*', markersize=10)
-plt.savefig('0.png', dpi = 600)
+plt.savefig('1.png', dpi = 600)
 plt.show()
 
