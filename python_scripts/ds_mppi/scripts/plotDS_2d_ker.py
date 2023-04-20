@@ -134,19 +134,12 @@ if policy['mu_c'][0][0]<10:
     kernel_values[kernel_values > 0.98] = 1
 
     clr0 = np.array([1, 1, 1, 1])
+    #clr0 = np.array([.7, .8, .4, 1])
+
     clr2 = np.array([.46, .67, .18, 1])
     nrange = 500
     carr = np.linspace(clr0, clr2, nrange)
-    # carr = np.zeros((1000, 4))
-    # carr[:, 3] = 1
-    # carr[0:nrange] = np.linspace(clr0, clr2, nrange)
-    # carr[nrange:] = clr2
-
-    # scale_arr = 1/(1+np.exp(-np.linspace(-10, 100, nrange)))
-    # carr1 = np.linspace(clr0, clr2, nrange)
-    # carr2 = np.linspace(clr1, clr2, nrange)
-    # for i in range(nrange):
-    #     carr[i] = carr1[i]*(1-scale_arr[i]) + carr2[i]*(scale_arr[i])
+    #carr[0] = [1, 1, 1, 1]
     plt.contourf(points_grid[0], points_grid[1], kernel_values,
                  levels=nrange,
                  cmap=ListedColormap(carr), vmin=0, vmax=1)

@@ -51,7 +51,8 @@ planner:
 integrator:
   n_trajectories: 1
   horizon: 2
-  dt: 0.001
+  dt: 0.01 #0.001 for real robot, 0.01 for sim and benchmarks
+
   collision_threshold: 0.03
   desired_frequency: 100
 

@@ -60,8 +60,8 @@ for i in range(N_REP):
     for i in range(H):
         tens_input.requires_grad = False
         tens_input = tens_input+0.1
-        #y_pred = nn_model.compute_signed_distance_wgrad(tens_input, 'closest')
-        y_pred = nn_model.dist_grad_closest(tens_input)
+        y_pred = nn_model.compute_signed_distance_wgrad(tens_input, 'closest')
+        #y_pred = nn_model.dist_grad_closest(tens_input)
         #y_pred = nn_model.model.forward(tens_input)
         #y_pred = nn_model.compute_signed_distance_wgrad2(tens_input)
         # y_pred = aot_fn(tens_input)

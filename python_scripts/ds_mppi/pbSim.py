@@ -106,7 +106,7 @@ def main_loop():
             h = 1000
             w = 1000
             k = 3
-            camera_data = p.getCameraImage(k*h, k*w, renderer=p.ER_TINY_RENDERER, shadow=1, lightDirection=[5, 5, 5],)
+            camera_data = p.getCameraImage(k*h, k*w, renderer=p.ER_TINY_RENDERER, shadow=1, lightDirection=[5, -5, 5],)
             # save rgb image to file
             im = Image.fromarray(camera_data[2])
             im.save(f'screenshots/screen{int(time.time())}.png')

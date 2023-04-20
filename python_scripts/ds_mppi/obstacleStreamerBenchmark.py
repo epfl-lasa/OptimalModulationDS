@@ -65,7 +65,7 @@ def main_loop():
         # get robot state
         state, state_recv_status = zmq_try_recv(state, socket_receive_state)
 
-        if state_recv_status and (state - q_0).norm().numpy() < 1e-6:
+        if state_recv_status and (state['q'] - q_0).norm().numpy() < 1e-6:
             obs -= torch.tensor([0, 0, 0.05, 0])
             moved = True
         # send obstacles
