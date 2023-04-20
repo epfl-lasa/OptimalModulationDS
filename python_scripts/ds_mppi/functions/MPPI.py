@@ -329,8 +329,11 @@ class MPPI:
         mean_kernel_activation_all = max_kernel_activation_each.mean(dim=0)
         update_mask = mean_kernel_activation_all > self.ker_thr
         print(f'Updating {sum(update_mask)} kernels!')
+        update_mask_base = self.kernel_val_all[0, :, 0:self.Policy.n_kernels].mean(dim=0) > self.ker_thr
+        update_mask = update_mask_base * update_mask
+        print(f'Updating (#2) {sum(update_mask)} kernels!')
         self.Policy.update_policy(w, self.policy_upd_rate, update_mask)
-        return 0
+        return 0, sum(update_mask).item()
 
     def update_obstacles(self, obs):
         self.obs = obs

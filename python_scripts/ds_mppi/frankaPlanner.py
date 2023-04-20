@@ -93,17 +93,26 @@ def main_loop():
 
     print('Init time: %4.2fs' % (time.time() - t00))
     t0 = time.time()
+    upd_mask = []
     while True:
         t_iter = time.time()
         # [ZMQ] Receive state from integrator
         state_dict, state_recv_status = zmq_try_recv(mppi.q_cur, socket_receive_state)
         if state_recv_status:
             mppi.q_cur = state_dict['q']
-            if state_dict['ds_idx'] != mppi.DS_idx:
-                mppi.switch_DS_idx(state_dict['ds_idx'])
+            if (mppi.q_cur - q_0).norm().numpy() < 1e-6:
                 print('Resetting policy')
+                print(upd_mask)
                 mppi.Policy.reset_policy()
                 all_kernel_fk = []
+                upd_mask = []
+
+            # if state_dict['ds_idx'] != mppi.DS_idx:
+            #     mppi.switch_DS_idx(state_dict['ds_idx'])
+            #     print('Resetting policy')
+            #     mppi.Policy.reset_policy()
+            #     all_kernel_fk = []
+
         # [ZMQ] Receive obstacles
         obstacles_data, obs_recv_status = zmq_try_recv(mppi.obs, socket_receive_obs)
         mppi.update_obstacles(obstacles_data)
@@ -123,8 +132,8 @@ def main_loop():
             cost = mppi.get_cost() # don't delete, writes to self.cost
             best_idx = torch.argmin(cost)
             print(f'Best cost: {cost[best_idx]}')
-            mppi.shift_policy_means()
-
+            _, tmp = mppi.shift_policy_means()
+            upd_mask.append(tmp)
         # Check trajectory for new kernel candidates and add policy kernels
         kernel_candidates = mppi.Policy.check_traj_for_kernels(all_traj, closests_dist_all, dotproducts_all, dst_thr - mppi.dst_thr, thr_rbf_add, thr_dot_add)
 

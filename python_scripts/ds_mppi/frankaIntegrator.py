@@ -130,7 +130,7 @@ def main_loop():
             # mppi_step.switch_DS_idx(N_SUCCESS % 2)
 
             mppi_step.q_cur = q_0
-            state_dict = {'q': mppi_step.q_cur, 'dq': mppi_step.q_cur*0, 'ds_idx': mppi_step.DS_idx}
+            state_dict = {'q': mppi_step.q_cur, 'dq': mppi_step.q_cur*0, 'ds_idx': N_SUCCESS % 2}
             socket_send_state.send_pyobj(state_dict)
 
             status = f'1: Goal reached in {N_ITER_TRAJ:3d} iterations ({t_traj:4.2f} seconds). ' \

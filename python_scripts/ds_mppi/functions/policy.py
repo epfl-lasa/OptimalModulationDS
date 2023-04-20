@@ -70,6 +70,8 @@ class TensorPolicyMPPI:
                                                 + self.sigma_c[:self.n_kernels]
         self.alpha_tmp[:, :self.n_kernels] = self.alpha_tmp[:, :self.n_kernels].normal_(mean=0, std=self.alpha_s) \
                                                 + self.alpha_c[:self.n_kernels]
+        # inject zero trajectory
+        self.alpha_tmp[0, :self.n_kernels] = self.alpha_c[:self.n_kernels]
         #inject rest pose reaching
         # if self.n_traj > 5:
         #     self.alpha_tmp[0, :self.n_kernels] = -(self.mu_c[:self.n_kernels] - self.rest)
