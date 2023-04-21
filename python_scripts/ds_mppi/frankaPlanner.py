@@ -6,6 +6,7 @@ from zmq_utils import *
 import torch
 from LinDS import *
 from SEDS import *
+import numpy as np
 
 sys.path.append('../mlp_learn/')
 from sdf.robot_sdf import RobotSdfCollisionNet
@@ -94,19 +95,25 @@ def main_loop():
     print('Init time: %4.2fs' % (time.time() - t00))
     t0 = time.time()
     upd_mask = []
+    n_ker_array = []
     while True:
         t_iter = time.time()
+
         # [ZMQ] Receive state from integrator
         state_dict, state_recv_status = zmq_try_recv(mppi.q_cur, socket_receive_state)
         if state_recv_status:
             mppi.q_cur = state_dict['q']
-            if (mppi.q_cur - q_0).norm().numpy() < 1e-6:
+            if (mppi.q_cur - q_0).norm().numpy() < 1e-6 and N_ITER > 5:
                 print('Resetting policy')
                 print(upd_mask)
+                fname = 'experiment_logs/planner_logs/log_' + time.strftime('%H:%M:%S-%d-%m-%y') + '.txt'
+                np.savetxt(fname, np.array([upd_mask, n_ker_array]))
                 mppi.Policy.reset_policy()
                 all_kernel_fk = []
                 upd_mask = []
-
+                n_ker_array = []
+                N_ITER = 0
+                t0 = time.time()
             # if state_dict['ds_idx'] != mppi.DS_idx:
             #     mppi.switch_DS_idx(state_dict['ds_idx'])
             #     print('Resetting policy')
@@ -134,6 +141,7 @@ def main_loop():
             print(f'Best cost: {cost[best_idx]}')
             _, tmp = mppi.shift_policy_means()
             upd_mask.append(tmp)
+            n_ker_array.append(mppi.Policy.n_kernels)
         # Check trajectory for new kernel candidates and add policy kernels
         kernel_candidates = mppi.Policy.check_traj_for_kernels(all_traj, closests_dist_all, dotproducts_all, dst_thr - mppi.dst_thr, thr_rbf_add, thr_dot_add)
 
@@ -171,8 +179,8 @@ def main_loop():
 
 
         N_ITER += 1
-        if N_ITER > 10000:
-            break
+        # if N_ITER > 10000:
+        #     break
         # print(q_cur)
         t_iter = time.time() - t_iter
         print(f'Iteration:{N_ITER:4d}, Time:{t_iter:4.2f}, Frequency:{1/t_iter:4.2f},',

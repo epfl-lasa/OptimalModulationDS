@@ -144,8 +144,8 @@ def main_loop():
             N_SUCCESS += 1
             time.sleep(1)
             t_traj_start = time.time()
-            # with open(fname, "a") as myfile:
-            #     myfile.write(status+'\n')
+            with open(fname, "a") as myfile:
+                myfile.write(status+'\n')
 
         if t_traj >= 10:
             # mppi_step.switch_DS_idx(N_SUCCESS % 2)
@@ -159,8 +159,8 @@ def main_loop():
             N_SUCCESS += 1
             time.sleep(1)
             t_traj_start = time.time()
-            # with open(fname, "a") as myfile:
-            #     myfile.write(status+'\n')
+            with open(fname, "a") as myfile:
+                myfile.write(status+'\n')
 
 
         t_iter_tmp = time.time() - t_iter_start

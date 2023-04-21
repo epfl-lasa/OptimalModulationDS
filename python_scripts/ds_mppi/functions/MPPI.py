@@ -333,7 +333,7 @@ class MPPI:
         update_mask = update_mask_base * update_mask
         print(f'Updating (#2) {sum(update_mask)} kernels!')
         self.Policy.update_policy(w, self.policy_upd_rate, update_mask)
-        return 0, sum(update_mask).item()
+        return 0, sum(update_mask)
 
     def update_obstacles(self, obs):
         self.obs = obs
