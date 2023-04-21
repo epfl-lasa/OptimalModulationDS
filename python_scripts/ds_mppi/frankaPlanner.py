@@ -113,6 +113,7 @@ def main_loop():
                 upd_mask = []
                 n_ker_array = []
                 N_ITER = 0
+                time.sleep(0.9)
                 t0 = time.time()
             # if state_dict['ds_idx'] != mppi.DS_idx:
             #     mppi.switch_DS_idx(state_dict['ds_idx'])

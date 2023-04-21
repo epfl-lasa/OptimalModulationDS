@@ -28,6 +28,7 @@ def main_loop():
 
     # socket to receive data from robot
     ip_pc = '128.178.145.79'
+    ip_pc = '128.178.145.5'
     socket_receive_robot = init_subscriber(context, ip_pc, 6969)
 
     # socket to publish data to slow loop

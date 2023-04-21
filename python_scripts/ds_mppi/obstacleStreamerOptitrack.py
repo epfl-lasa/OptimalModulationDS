@@ -105,8 +105,11 @@ def main_loop():
     # socket to publish obstacles
     socket_send_obs = init_publisher(context, '*', config["zmq"]["obstacle_port"])
 
-    # socket to receive state from integrator
-    socket_receive_optitrack = init_subscriber(context, '128.178.145.79', 5511)
+    # socket to receive data from optitrack (pc1)
+    # socket_receive_optitrack = init_subscriber(context, '128.178.145.79', 5511)
+
+    # socket to receive data from optitrack (pc2)
+    socket_receive_optitrack = init_subscriber(context, '128.178.145.5', 5511)
 
     freq = config["obstacle_streamer"]["frequency"]
     t_0 = time.time()
@@ -152,13 +155,15 @@ def main_loop():
             bodies = process_raw_message(optitrack_data, params)
             #print(bodies)
             # if len(bodies) > 0:
-            #     obs[0] = get_ball_pos(bodies, 0.05)
             if len(bodies) > 0:
-                human_dict, human_spheres = get_human_pos(bodies, human_dict)
-                n_sph = len(human_spheres)
-                if n_sph > 0:
-                    obs = human_spheres
-        human_dict, obs = get_human_pos(deepcopy(body_arr), human_dict)
+                if 1:
+                    human_dict, human_spheres = get_human_pos(bodies, human_dict)
+                    n_sph = len(human_spheres)
+                    if n_sph > 0:
+                        obs = human_spheres
+                        moved = True
+                else:
+                    obs[0] = get_ball_pos(bodies, 0.07)
 
         socket_send_obs.send_pyobj(obs)
         time.sleep(1/freq)
