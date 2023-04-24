@@ -5,33 +5,41 @@ import os
 np.set_printoptions(precision=3, suppress=True)
 
 files_list = []
-base_path = "../experiment_logs/planner_logs/5/"
-for file in os.listdir(base_path):
+base_path = "../experiment_logs/planner_logs/6/"
+for file in sorted(os.listdir(base_path)):
     if file.endswith(".txt"):
         files_list.append(base_path+file)
 
 print(files_list)
 mpc_act_rates = []
 iters = []
-for fname in files_list:
+n_iter_max = 100
+n_ker = []
+for fname in files_list[:115]:
     print('Parsing file %s'%fname)
     exp_data = np.loadtxt(fname)
     print(exp_data)
     n_iter = exp_data.shape[1]
-    iters.append(n_iter)
-    n_noupd = np.sum(exp_data[0] == 0)
-    mpc_act_rates.append(1 - n_noupd/n_iter)
-    print('Number of iterations: %d' % n_iter)
-    print('Number of iterations without kernel update: %d' % n_noupd)
-    print('MPC activation rate: %f' % (1 - n_noupd/n_iter))
+    if n_iter < n_iter_max:
+        n_ker.append(exp_data[1, -1])
+        iters.append(n_iter)
+        n_noupd = np.sum(exp_data[0] == 0)
+        mpc_act_rates.append(1 - n_noupd/n_iter)
+        print('Number of iterations: %d' % n_iter)
+        print('Number of iterations without kernel update: %d' % n_noupd)
+        print('MPC activation rate: %f' % (1 - n_noupd/n_iter))
 
 idx_nompc = np.array(mpc_act_rates) == 0
 arr_mpc_act = np.array(mpc_act_rates)[~idx_nompc]
+n_ker = np.array(n_ker)
+print('---------------------------------')
 print('Average iteration number: %f' % np.mean(iters))
 print('Std iteration number: %f' % np.std(iters))
-print('Trajectories without MPC: %d, Rate: %f' % (np.sum(idx_nompc), np.sum(idx_nompc)/len(mpc_act_rates)))
+print('Trajectories without MPC: %d, MPC Rate: %f' % (np.sum(idx_nompc), 1- np.sum(idx_nompc)/len(mpc_act_rates)))
 print('Average MPC activation rate: %f' % np.mean(arr_mpc_act))
 print('Std MPC activation rate: %f' % np.std(arr_mpc_act))
+print('Average number of kernels: %f' % np.mean(n_ker[~idx_nompc]))
+print('Std number of kernels: %f' % np.std(n_ker[~idx_nompc]))
 # for i in [2, 3, 4, 5, 6, 7]:
 #     with open("../experiment_logs/storm_%d.txt"%i, "r") as f:
 #         data = f.read().replace('\n', '')

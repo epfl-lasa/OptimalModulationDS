@@ -103,23 +103,23 @@ def main_loop():
         state_dict, state_recv_status = zmq_try_recv(mppi.q_cur, socket_receive_state)
         if state_recv_status:
             mppi.q_cur = state_dict['q']
-            if (mppi.q_cur - q_0).norm().numpy() < 1e-6 and N_ITER > 5:
-                print('Resetting policy')
-                print(upd_mask)
-                fname = 'experiment_logs/planner_logs/log_' + time.strftime('%H:%M:%S-%d-%m-%y') + '.txt'
-                np.savetxt(fname, np.array([upd_mask, n_ker_array]))
-                mppi.Policy.reset_policy()
-                all_kernel_fk = []
-                upd_mask = []
-                n_ker_array = []
-                N_ITER = 0
-                time.sleep(0.9)
-                t0 = time.time()
-            # if state_dict['ds_idx'] != mppi.DS_idx:
-            #     mppi.switch_DS_idx(state_dict['ds_idx'])
+            # if (mppi.q_cur - q_0).norm().numpy() < 1e-6 and N_ITER > 5:
             #     print('Resetting policy')
+            #     print(upd_mask)
+            #     fname = 'experiment_logs/planner_logs/log_' + time.strftime('%H:%M:%S-%d-%m-%y') + '.txt'
+            #     np.savetxt(fname, np.array([upd_mask, n_ker_array]))
             #     mppi.Policy.reset_policy()
             #     all_kernel_fk = []
+            #     upd_mask = []
+            #     n_ker_array = []
+            #     N_ITER = 0
+            #     time.sleep(0.9)
+            #     t0 = time.time()
+            if state_dict['ds_idx'] != mppi.DS_idx:
+                mppi.switch_DS_idx(state_dict['ds_idx'])
+                print('Resetting policy')
+                mppi.Policy.reset_policy()
+                all_kernel_fk = []
 
         # [ZMQ] Receive obstacles
         obstacles_data, obs_recv_status = zmq_try_recv(mppi.obs, socket_receive_obs)
