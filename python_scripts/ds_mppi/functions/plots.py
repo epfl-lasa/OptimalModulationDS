@@ -26,7 +26,7 @@ def init_jpos_plot(xmin, xmax, ymin, ymax):
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_aspect('equal')
-    rob, = plt.plot([], [], 'o', color=[1, 0.1, 0.1], markersize=7)
+    rob, = plt.plot([], [], 'o', color=[0, 0.4470, 0.7410], markersize=7)
     plt.ion()
     plt.show()
     return rob

@@ -60,8 +60,9 @@ def main_int():
     q_f = torch.zeros(DOF).to(**params)
     q_0[0] = torch.pi / 2
     q_f[0] = -torch.pi / 2
-    q_f = torch.tensor([1.6300, 1.5000]).to(**params)
-    q_0 = torch.tensor([-1.6900, -0.0000]).to(**params)
+    q_0 = torch.tensor([0,  1.57]).to(**params)
+    q_f = torch.tensor([0, -1.57]).to(**params)
+
     # Robot parameters
     dh_a = torch.zeros(DOF + 1).to(**params)
     dh_a[1:] = L  # link length
@@ -70,15 +71,33 @@ def main_int():
     # obs = torch.tensor([[5, 1, 0, .5],
     #                     [16, 0, 0, .5],
     #                     [15, -1, 0, .5]]).to(**params)
-    obs = torch.tensor([[-1.2, -1.8, 0, .5],
-                        [1.2, -4.8, 0, .5]]).to(**params)
-    n_dummy = 1
-    dummy_obs = torch.hstack((torch.zeros(n_dummy, 3)+6, torch.zeros(n_dummy, 1)+0.1)).to(**params)
-    obs = torch.vstack((obs, dummy_obs))
+    obs = torch.tensor([[6.0, 0.5, 0, .5],[6.0, 0.0, 0, .5],[6.0, -0.5, 0, .5],
+                        [1.5, 1.25, 0, .5]]).to(**params)
+
+    n_dummy = 0
+    if n_dummy > 0:
+        dummy_obs = torch.hstack((torch.zeros(n_dummy, 3)+6, torch.zeros(n_dummy, 1)+0.1)).to(**params)
+        obs = torch.vstack((obs, dummy_obs))
     # Plotting
     r_h = init_robot_plot(dh_params, -10, 10, -10, 10)
     c_h = init_kernel_means(100)
     o_h_arr = plot_obs_init(obs)
+
+    jpos_h = init_jpos_plot(-1.1 * np.pi, 1.1 * np.pi, -1.1 * np.pi, 1.1 * np.pi)
+    ## plot obstacles in joint space [only for 2d case]
+    N_MESHGRID = 100
+    points_grid = torch.meshgrid([torch.linspace(-np.pi, np.pi, N_MESHGRID) for i in range(DOF)])
+    q_tens = torch.stack(points_grid, dim=-1).reshape(-1, DOF)
+    nn_input = torch.hstack((q_tens.tile(obs.shape[0], 1), obs.repeat_interleave(q_tens.shape[0], 0)))
+    nn_dist = nn_model.model_jit(nn_input[:, 0:-1])
+    nn_dist -= nn_input[:, -1].unsqueeze(1)
+    mindist, _ = nn_dist.min(1)
+    mindist_obst = mindist.reshape(-1, N_MESHGRID, N_MESHGRID).detach().numpy()
+    mindist_all = mindist_obst.min(0)
+    carr = np.linspace([.1, .1, 1, 1], [1, 1, 1, 1], 256)
+    fig = plt.figure(2)
+    zero_contour = plt.contour(points_grid[0], points_grid[1], mindist_all, levels=[0], colors='r')
+
     # Integration parameters
     A = -1 * torch.diag(torch.ones(DOF)).to(**params) #nominal DS
     DS1 = LinDS(q_f)
@@ -97,15 +116,15 @@ def main_int():
     thr_dot_add = -0.9
 
     #primary MPPI to sample naviagtion policy
-    mppi = MPPI(q_0, q_f, dh_params, obs, dt, dt_H, N_traj, DS_ARRAY, dh_a, nn_model, 1)
+    mppi = MPPI(q_0, q_f, dh_params, obs, dt, dt_H, N_traj, DS_ARRAY, dh_a, nn_model, 2)
     mppi.Policy.sigma_c_nominal = 0.5
     mppi.Policy.alpha_s = 3
     mppi.Policy.policy_upd_rate = 0.5
     mppi.dst_thr = dst_thr/2      # substracted from actual distance (added threshsold)
     mppi.ker_thr = 1e-3         # used to create update mask for policy means
     mppi.ignored_links = []
-    mppi.Cost.q_min = -0.9*3.14*torch.ones(DOF).to(**params)
-    mppi.Cost.q_max =  0.9*3.14*torch.ones(DOF).to(**params)
+    mppi.Cost.q_min = -0.99*3.14*torch.ones(DOF).to(**params)
+    mppi.Cost.q_max =  0.99*3.14*torch.ones(DOF).to(**params)
     #set up second mppi to move the robot
     mppi_step = MPPI(q_0, q_f, dh_params, obs, dt_sim, 1, 1, DS_ARRAY, dh_a, nn_model, 1)
 
@@ -172,6 +191,7 @@ def main_int():
             #print(mppi.qdot[best_idx, :] - mppi_step.qdot[0, :])
             cur_fk, _ = numeric_fk_model(mppi.q_cur, dh_params, 10)
             upd_r_h(cur_fk.to('cpu'), r_h)
+            upd_jpos_plot(mppi.q_cur, jpos_h)
             r_h.set_zorder(1000)
             # obs[0, 0] += 0.03
             # plot_obs_update(o_h_arr, obs)
