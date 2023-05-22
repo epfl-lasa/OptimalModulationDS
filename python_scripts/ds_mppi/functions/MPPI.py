@@ -135,7 +135,7 @@ class MPPI:
                 # l_n[l_n < 0] = 0
                 # l_tau[l_tau < 1] = 1
                 # calculate own modulation coefficients
-                if 0:
+                if 1:
                     # for planar robot (units)
                     dist_low, dist_high = 0.0, 2.5
                     k_sigmoid = 3

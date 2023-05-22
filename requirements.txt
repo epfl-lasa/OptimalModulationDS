@@ -1,0 +1,7 @@
+matplotlib
+numpy
+pybullet
+PyYAML
+pyzmq
+scipy
+torch

@@ -8,6 +8,7 @@ sys.path.append('../functions/')
 from MPPI import *
 sys.path.append('../../mlp_learn/')
 from sdf.robot_sdf import RobotSdfCollisionNet
+from LinDS import *
 
 # define tensor parameters (cpu or cuda:0)
 if 1:
@@ -76,6 +77,10 @@ def main_int():
     o_h_arr = plot_obs_init(obs)
     # Integration parameters
     A = -1 * torch.diag(torch.ones(DOF)).to(**params) #nominal DS
+    DS1 = LinDS(q_f)
+    DS2 = LinDS(q_0)
+    DS_ARRAY = [DS1, DS2]
+
     N_traj = 100                 # number of trajectories in exploration sampling
     dt_H = 10                   # horizon length in exploration sampling
     dt = 0.3                    # integration timestep in exploration sampling
@@ -88,7 +93,7 @@ def main_int():
     thr_dot_add = -0.9
 
     #primary MPPI to sample naviagtion policy
-    mppi = MPPI(q_0, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a, nn_model, 1)
+    mppi = MPPI(q_0, q_f, dh_params, obs, dt, dt_H, N_traj, DS_ARRAY, dh_a, nn_model, 1)
     mppi.Policy.sigma_c_nominal = 0.5
     mppi.Policy.alpha_s = 0.75
     mppi.Policy.policy_upd_rate = 0.5
@@ -97,7 +102,7 @@ def main_int():
     mppi.ignored_links = []
 
     #set up second mppi to move the robot
-    mppi_step = MPPI(q_0, q_f, dh_params, obs, dt_sim, 1, 1, A, dh_a, nn_model, 1)
+    mppi_step = MPPI(q_0, q_f, dh_params, obs, dt_sim, 1, 1, DS_ARRAY, dh_a, nn_model, 1)
     mppi_step.Policy.alpha_s *= 0
     mppi_step.ignored_links = []
 

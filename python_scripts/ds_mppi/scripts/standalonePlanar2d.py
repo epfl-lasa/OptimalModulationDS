@@ -8,6 +8,7 @@ sys.path.append('../functions/')
 from MPPI import *
 sys.path.append('../../mlp_learn/')
 from sdf.robot_sdf import RobotSdfCollisionNet
+from LinDS import *
 
 # define tensor parameters (cpu or cuda:0)
 if 1:
@@ -59,14 +60,18 @@ def main_int():
     q_f = torch.zeros(DOF).to(**params)
     q_0[0] = torch.pi / 2
     q_f[0] = -torch.pi / 2
+    q_f = torch.tensor([1.6300, 1.5000]).to(**params)
+    q_0 = torch.tensor([-1.6900, -0.0000]).to(**params)
     # Robot parameters
     dh_a = torch.zeros(DOF + 1).to(**params)
     dh_a[1:] = L  # link length
     dh_params = torch.vstack((dh_a * 0, dh_a * 0, dh_a, dh_a * 0)).T
     # Obstacle spheres (x, y, z, r)
-    obs = torch.tensor([[5, 1, 0, .5],
-                        [16, 0, 0, .5],
-                        [15, -1, 0, .5]]).to(**params)
+    # obs = torch.tensor([[5, 1, 0, .5],
+    #                     [16, 0, 0, .5],
+    #                     [15, -1, 0, .5]]).to(**params)
+    obs = torch.tensor([[-1.2, -1.8, 0, .5],
+                        [1.2, -4.8, 0, .5]]).to(**params)
     n_dummy = 1
     dummy_obs = torch.hstack((torch.zeros(n_dummy, 3)+6, torch.zeros(n_dummy, 1)+0.1)).to(**params)
     obs = torch.vstack((obs, dummy_obs))
@@ -76,6 +81,10 @@ def main_int():
     o_h_arr = plot_obs_init(obs)
     # Integration parameters
     A = -1 * torch.diag(torch.ones(DOF)).to(**params) #nominal DS
+    DS1 = LinDS(q_f)
+    DS2 = LinDS(q_0)
+    DS_ARRAY = [DS1, DS2]
+
     N_traj = 100                 # number of trajectories in exploration sampling
     dt_H = 10                   # horizon length in exploration sampling
     dt = 0.3                    # integration timestep in exploration sampling
@@ -88,9 +97,9 @@ def main_int():
     thr_dot_add = -0.9
 
     #primary MPPI to sample naviagtion policy
-    mppi = MPPI(q_0, q_f, dh_params, obs, dt, dt_H, N_traj, A, dh_a, nn_model, 1)
+    mppi = MPPI(q_0, q_f, dh_params, obs, dt, dt_H, N_traj, DS_ARRAY, dh_a, nn_model, 1)
     mppi.Policy.sigma_c_nominal = 0.5
-    mppi.Policy.alpha_s = 0.75
+    mppi.Policy.alpha_s = 3
     mppi.Policy.policy_upd_rate = 0.5
     mppi.dst_thr = dst_thr/2      # substracted from actual distance (added threshsold)
     mppi.ker_thr = 1e-3         # used to create update mask for policy means
@@ -98,7 +107,8 @@ def main_int():
     mppi.Cost.q_min = -0.9*3.14*torch.ones(DOF).to(**params)
     mppi.Cost.q_max =  0.9*3.14*torch.ones(DOF).to(**params)
     #set up second mppi to move the robot
-    mppi_step = MPPI(q_0, q_f, dh_params, obs, dt_sim, 1, 1, A, dh_a, nn_model, 1)
+    mppi_step = MPPI(q_0, q_f, dh_params, obs, dt_sim, 1, 1, DS_ARRAY, dh_a, nn_model, 1)
+
     mppi_step.Policy.alpha_s *= 0
     mppi_step.ignored_links = []
 

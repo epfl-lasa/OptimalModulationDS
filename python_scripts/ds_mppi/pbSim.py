@@ -26,7 +26,8 @@ def main_loop():
     p.configureDebugVisualizer(lightPosition=[5, 5, 5])
     p.setPhysicsEngineParameter(maxNumCmdPer1ms=1000)
     #p.resetDebugVisualizerCamera(cameraDistance=1.5, cameraYaw=110, cameraPitch=-10, cameraTargetPosition=[0, 0, 0.5])
-    p.resetDebugVisualizerCamera(cameraDistance=1.5, cameraYaw=110, cameraPitch=-25, cameraTargetPosition=[0, 0, 0.5])
+    #p.resetDebugVisualizerCamera(cameraDistance=1.5, cameraYaw=110, cameraPitch=-25, cameraTargetPosition=[0, 0, 0.5])
+    p.resetDebugVisualizerCamera(cameraDistance=1.5, cameraYaw=145, cameraPitch=-10, cameraTargetPosition=[0, 0, 0.6])
 
     p.setAdditionalSearchPath(pd.getDataPath())
     timeStep = 0.01
@@ -55,6 +56,8 @@ def main_loop():
 
     #state = [-1.2, -0.08, 0, -2, -0.16,  1.6, -0.75]
     state = config["general"]["q_0"]
+    state = [ 0,         0,         0,   -1.5708,         0,    1.8675,         0]
+
     obs = []
     sphere_manager = SphereManager(p)
     kernel_manager = KernelManager(p)
@@ -105,8 +108,10 @@ def main_loop():
             #get image from camera
             h = 1000
             w = 1000
-            k = 3
-            camera_data = p.getCameraImage(k*h, k*w, renderer=p.ER_TINY_RENDERER, shadow=1, lightDirection=[5, -5, 5],)
+            k = 5
+            vm = [-1.2287,   -0.1494,   -0.8473, 0,0.8604,   -0.2134,   -1.2101, 0,-0.0 ,0.9848 ,  -0.1736  ,       0,0.1842,   -0.3110,   12.8415,    1.0000]
+            pm = p.computeProjectionMatrixFOV(60, 1, 5, 6)
+            camera_data = p.getCameraImage(k*h, k*w, renderer=p.ER_TINY_RENDERER, shadow=1, lightDirection=[5, 5, 5], projectionMatrix=pm)
             # save rgb image to file
             im = Image.fromarray(camera_data[2])
             im.save(f'screenshots/screen{int(time.time())}.png')
