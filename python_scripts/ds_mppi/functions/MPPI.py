@@ -129,7 +129,7 @@ class MPPI:
                 dotproduct = (E[:, :, 0] * nominal_velocity_normalized).sum(dim=-1)
                 self.dot_products[:, i-1] = dotproduct
                 #l_vel = generalized_sigmoid(dotproduct, 0, 1, -0.2, 0.0, 100)
-                l_vel = generalized_sigmoid(dotproduct, 0, 1, -1, -0.75, 30)
+                l_vel = generalized_sigmoid(dotproduct, 0, 1, -1, -0.75, 10)
 
             with record_function("TAG: Modulation-propagation"):
                 # calculate standard modulation coefficients
@@ -149,7 +149,7 @@ class MPPI:
                     dist_low, dist_high = 0.03, 0.1
                     k_sigmoid = 100
                 ln_min, ln_max = 0, 1
-                ltau_min, ltau_max = 1, 3
+                ltau_min, ltau_max = 1, 5
                 l_n = generalized_sigmoid(distance, ln_min, ln_max, dist_low, dist_high, k_sigmoid)
                 l_n_vel = l_vel * 1 + (1 - l_vel) * l_n
                 l_tau = generalized_sigmoid(distance, ltau_max, ltau_min, dist_low, dist_high, k_sigmoid)
@@ -213,7 +213,7 @@ class MPPI:
                 mod_velocity = torch.nan_to_num(mod_velocity / mod_velocity_norm)
                 # slow down and repulsion for collision case
                 mod_velocity[distance < 0] *= 0.1
-                repulsion_velocity = E[:, :, 0] * nominal_velocity_norm*0.2
+                repulsion_velocity = E[:, :, 0] * nominal_velocity_norm*0.1
                 mod_velocity[distance < 0] += repulsion_velocity[distance < 0]
             with record_function("TAG: Propagate"):
                 # propagate

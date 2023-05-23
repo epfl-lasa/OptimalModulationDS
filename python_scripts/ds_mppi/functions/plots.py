@@ -9,10 +9,11 @@ def init_robot_plot(links, xmin, xmax, ymin, ymax):
     ax = fig.add_subplot(111)
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
+    ax.set_xlabel('x, m')
+    ax.set_ylabel('y, m')
     ax.set_aspect('equal')
     line_h, = plt.plot([], [], 'o-', color=[0, 0.4470, 0.7410], linewidth=3, markersize=5)
+    plt.title('Planar Robot')
     plt.show()
     return line_h
 
@@ -23,18 +24,21 @@ def init_jpos_plot(xmin, xmax, ymin, ymax):
     ax = fig.add_subplot(111)
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
-    ax.set_xlabel('q_1')
-    ax.set_ylabel('q_2')
+    ax.set_xlabel('First Joint, radians')
+    ax.set_ylabel('Second Joint, radians')
     ax.set_aspect('equal')
     rob, = plt.plot([], [], 'o', color=[0, 0.4470, 0.7410], markersize=7)
     plt.ion()
+    plt.title('Joint Space')
     plt.show()
     return rob
 
 def init_kernel_means(n_kernel_max):
     c_h = []
     for i in range(n_kernel_max):
-        tmp, = plt.plot([], [], '-o', color=[0, 0.60, 0.90], markersize=2, linewidth=.2)
+        # tmp, = plt.plot([], [], '-o', color=[0, 0.60, 0.90], markersize=2, linewidth=.5)
+        tmp, = plt.plot([], [], '-o', color='g', markersize=2, linewidth=.5)
+
         c_h.append(tmp)
     return c_h
 
