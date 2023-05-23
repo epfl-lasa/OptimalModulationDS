@@ -122,7 +122,7 @@ def main_int():
             # Propagate modulated DS
 
             with record_function("TAG: general propagation"):
-                all_traj, closests_dist_all, kernel_val_all, dotproducts_all = mppi.propagate()
+                all_traj, closests_dist_all, kernel_val_all, dotproducts_all, _ = mppi.propagate()
 
             with record_function("TAG: cost calculation"):
                 # Calculate cost
@@ -161,7 +161,7 @@ def main_int():
             mppi_step.Policy.n_kernels = mppi.Policy.n_kernels
             mppi_step.Policy.sample_policy()
             mppi_step.q_cur = copy.copy(mppi.q_cur)
-            _, _, _, _ = mppi_step.propagate()
+            _, _, _, _, _ = mppi_step.propagate()
             mppi.q_cur = mppi.q_cur + mppi_step.qdot[0, :] * dt_sim
             #print(mppi.qdot[best_idx, :] - mppi_step.qdot[0, :])
             cur_fk, _ = numeric_fk_model(mppi.q_cur, dh_params, 10)

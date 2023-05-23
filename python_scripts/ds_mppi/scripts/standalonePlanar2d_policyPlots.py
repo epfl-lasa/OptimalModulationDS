@@ -132,8 +132,9 @@ def main_int():
     thr_dot_add = -0.9
 
     #primary MPPI to sample naviagtion policy
-    mppi = MPPI(q_0, q_f, dh_params, obs, dt, dt_H, N_traj, DS_ARRAY, dh_a, nn_model, 2)
-    mppi.Policy.sigma_c_nominal = 0.5
+    n_closest_obs = 1
+    mppi = MPPI(q_0, q_f, dh_params, obs, dt, dt_H, N_traj, DS_ARRAY, dh_a, nn_model, n_closest_obs)
+    mppi.Policy.sigma_c_nominal = 1
     mppi.Policy.alpha_s = 2
     mppi.Policy.policy_upd_rate = 0.5
     mppi.dst_thr = dst_thr/2      # substracted from actual distance (added threshsold)
@@ -142,12 +143,12 @@ def main_int():
     mppi.Cost.q_min = -0.99*3.14*torch.ones(DOF).to(**params)
     mppi.Cost.q_max =  0.99*3.14*torch.ones(DOF).to(**params)
     #set up second mppi to move the robot
-    mppi_step = MPPI(q_0, q_f, dh_params, obs, dt_sim, 1, 1, DS_ARRAY, dh_a, nn_model, 1)
+    mppi_step = MPPI(q_0, q_f, dh_params, obs, dt_sim, 1, 1, DS_ARRAY, dh_a, nn_model, n_closest_obs)
 
     mppi_step.Policy.alpha_s *= 0
     mppi_step.ignored_links = []
 
-    mppi_vis = MPPI(q_0, q_f, dh_params, obs, dt_sim, 1, N_MESHGRID*N_MESHGRID, DS_ARRAY, dh_a, nn_model2, 1)
+    mppi_vis = MPPI(q_0, q_f, dh_params, obs, dt_sim, 1, N_MESHGRID*N_MESHGRID, DS_ARRAY, dh_a, nn_model2, n_closest_obs)
     mppi_vis.Policy.alpha_s *= 0
     mppi_vis.ignored_links = []
 
@@ -167,7 +168,7 @@ def main_int():
             # Propagate modulated DS
 
             with record_function("TAG: general propagation"):
-                all_traj, closests_dist_all, kernel_val_all, dotproducts_all = mppi.propagate()
+                all_traj, closests_dist_all, kernel_val_all, dotproducts_all, _ = mppi.propagate()
 
             with record_function("TAG: cost calculation"):
                 # Calculate cost
@@ -206,13 +207,14 @@ def main_int():
             mppi_step.Policy.n_kernels = mppi.Policy.n_kernels
             mppi_step.Policy.sample_policy()
             mppi_step.q_cur = copy.copy(mppi.q_cur)
-            _, _, _, _ = mppi_step.propagate()
+            _, _, _, _, _ = mppi_step.propagate()
             mppi.q_cur = mppi.q_cur + mppi_step.qdot[0, :] * dt_sim
             #print(mppi.qdot[best_idx, :] - mppi_step.qdot[0, :])
             cur_fk, _ = numeric_fk_model(mppi.q_cur, dh_params, 10)
             upd_r_h(cur_fk.to('cpu'), r_h)
             upd_jpos_plot(mppi.q_cur, jpos_h)
             r_h.set_zorder(1000)
+            jpos_h.set_zorder(1000)
             # obs[0, 0] += 0.03
             # plot_obs_update(o_h_arr, obs)
             plt.pause(0.0001)
@@ -241,14 +243,14 @@ def main_int():
 
             mppi_vis.q_cur = q_tens
 
-            trajs_vis, closest_dist_vis, kernel_val_all_vis, dotproducts_all_vis = mppi_vis.propagate()
+            trajs_vis, closest_dist_vis, kernel_val_all_vis, dotproducts_all_vis, kernel_acts_vis = mppi_vis.propagate()
             for i in range(mppi_vis.Policy.n_kernels):
                 if len(ker_contours) <= i:
-                    kernel_values = kernel_val_all_vis[:, :, i].reshape(N_MESHGRID, N_MESHGRID)
+                    kernel_values = (kernel_val_all_vis[:, :, i] * kernel_acts_vis).reshape(N_MESHGRID, N_MESHGRID)
                     #kernel_values[closest_dist_vis[:,:,i] < 0] = 0
                     kernel_values[kernel_values > 0.98] = 1
                     nrange = 500
-                    carr = np.linspace(np.array([1, 1, 1, 1]), np.array([.46, .67, .18, 1]), nrange)
+                    carr = np.linspace(np.array([1, 1, 1, 0]), np.array([.46, .67, .18, 1]), nrange)
                     ker_contours.append(plt.contourf(points_grid[0], points_grid[1], kernel_values,
                                  levels=nrange,
                                  cmap=ListedColormap(carr), vmin=0, vmax=1))
@@ -262,11 +264,11 @@ def main_int():
                         if isinstance(patch, mpl.patches.FancyArrowPatch):
                             patch.remove()
 
-            ds_h = plt.streamplot(points_grid[0][:, 0].numpy(),
-                           points_grid[1][0, :].numpy(),
-                           mppi_vis.qdot[:, 0].reshape(N_MESHGRID, N_MESHGRID).numpy().T,
-                           mppi_vis.qdot[:, 1].reshape(N_MESHGRID, N_MESHGRID).numpy().T,
-                           density=2, color='b', linewidth=0.5, arrowstyle='->')
+            # ds_h = plt.streamplot(points_grid[0][:, 0].numpy(),
+            #                points_grid[1][0, :].numpy(),
+            #                mppi_vis.qdot[:, 0].reshape(N_MESHGRID, N_MESHGRID).numpy().T,
+            #                mppi_vis.qdot[:, 1].reshape(N_MESHGRID, N_MESHGRID).numpy().T,
+            #                density=2, color='b', linewidth=0.5, arrowstyle='->')
             #ker_val_arr
             # first clean up all existing kernels from plots
             for i_k in range(len(ker_vis1)):

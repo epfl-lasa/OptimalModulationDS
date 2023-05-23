@@ -133,7 +133,7 @@ def main_loop():
         # Propagate modulated DS
         # print(f'Init state: {mppi.q_cur}')
         with record_function("TAG: general propagation"):
-            all_traj, closests_dist_all, kernel_val_all, dotproducts_all = mppi.propagate()
+            all_traj, closests_dist_all, kernel_val_all, dotproducts_all, _ = mppi.propagate()
 
         with record_function("TAG: cost calculation"):
             # Calculate cost

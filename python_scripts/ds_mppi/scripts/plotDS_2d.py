@@ -89,7 +89,7 @@ mppi_step = MPPI(q_0, attractor, torch.zeros(4, 4), obs_tens, 0.1, 1, 1, A, 0, n
 ds_flow = torch.zeros(q_tens.shape).to(**params)
 for i, point in enumerate(q_tens):
     mppi_step.q_cur = point
-    _, _, _, _ = mppi_step.propagate()
+    _, _, _, _, _ = mppi_step.propagate()
     ds_flow[i] = mppi_step.qdot[0, :]
     print(i)
 
@@ -105,7 +105,7 @@ trajs = []
 mppi_traj = MPPI(q_0, attractor, torch.zeros(4, 4), obs_tens, 0.1, 1000, 1, A, 0, nn_model, 5)
 for point in trajs_init:
     mppi_traj.q_cur = torch.tensor(point).to(**params)
-    traj, _, _, _ = mppi_traj.propagate()
+    traj, _, _, _, _ = mppi_traj.propagate()
     trajs.append(traj)
 
 for traj in trajs:

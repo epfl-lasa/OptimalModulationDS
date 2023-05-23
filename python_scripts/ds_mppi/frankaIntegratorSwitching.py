@@ -106,7 +106,7 @@ def main_loop():
         mppi_step.update_obstacles(obstacles_data)
         # Propagate modulated DS
         mppi_step.Policy.sample_policy()    # samples a new policy using planned means and sigmas
-        _, _, _, _ = mppi_step.propagate()
+        _, _, _, _, _ = mppi_step.propagate()
         # Update current robot state
         mppi_step.q_cur = mppi_step.q_cur + mppi_step.qdot[0, :] * dt_sim
         mppi_step.q_cur = torch.clamp(mppi_step.q_cur, mppi_step.Cost.q_min, mppi_step.Cost.q_max)

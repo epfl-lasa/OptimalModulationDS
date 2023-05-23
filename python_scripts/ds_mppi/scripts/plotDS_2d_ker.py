@@ -99,7 +99,7 @@ kernel_values = torch.zeros(q_tens.shape[0]).to(**params)
 
 for i, point in enumerate(q_tens):
     mppi_step.q_cur = point
-    _, _, ker_val, _ = mppi_step.propagate()
+    _, _, ker_val, _, _ = mppi_step.propagate()
     ds_flow[i] = mppi_step.qdot[0, :]
     kernel_values[i] = ker_val[0, 0, 0]
     print(i)
@@ -119,7 +119,7 @@ mppi_traj.Policy.alpha_s *= 0
 mppi_traj.Policy.sample_policy()  # samples a new policy using planned means and sigmas
 for point in trajs_init:
     mppi_traj.q_cur = torch.tensor(point).to(**params)
-    traj, _, _, _ = mppi_traj.propagate()
+    traj, _, _, _, _ = mppi_traj.propagate()
     trajs.append(traj)
 
 for traj in trajs:
