@@ -9,7 +9,8 @@ from MPPI import *
 sys.path.append('../../mlp_learn/')
 from sdf.robot_sdf import RobotSdfCollisionNet
 from LinDS import *
-
+from matplotlib.colors import ListedColormap
+import matplotlib as mpl
 # define tensor parameters (cpu or cuda:0)
 if 1:
     params = {'device': 'cpu', 'dtype': torch.float32}
@@ -51,8 +52,15 @@ def main_int():
 
     # nn_model.model_jit_q = torch.jit.script(nn_model.model_jit)
     # nn_model.model_jit_q = torch.jit.optimize_for_inference(nn_model.model_jit)
-
     nn_model.update_aot_lambda()
+
+    nn_model2 = RobotSdfCollisionNet(in_channels=DOF+3, out_channels=DOF, layers=[s] * n_layers, skips=skips)
+    nn_model2.load_weights('../../mlp_learn/models/' + fname, params)
+    nn_model2.model.to(**params)
+    nn_model2.model_jit = nn_model2.model
+    nn_model2.model_jit = torch.jit.script(nn_model2.model_jit)
+    nn_model2.model_jit = torch.jit.optimize_for_inference(nn_model2.model_jit)
+    nn_model2.update_aot_lambda()
 
     #nn_model.model.eval()
     # Initial state
@@ -89,21 +97,27 @@ def main_int():
     ## plot obstacles in joint space [only for 2d case]
     N_MESHGRID = 100
     points_grid = torch.meshgrid([torch.linspace(-np.pi, np.pi, N_MESHGRID) for i in range(DOF)])
-    q_tens = torch.stack(points_grid, dim=-1).reshape(-1, DOF)
+    q_tens = torch.stack(points_grid, dim=-1).reshape(-1, DOF).to(**params)
     nn_input = torch.hstack((q_tens.tile(obs.shape[0], 1), obs.repeat_interleave(q_tens.shape[0], 0)))
     nn_dist = nn_model.model_jit(nn_input[:, 0:-1])
     nn_dist -= nn_input[:, -1].unsqueeze(1)
     mindist, _ = nn_dist.min(1)
-    mindist_obst = mindist.reshape(-1, N_MESHGRID, N_MESHGRID).detach().numpy()
+    mindist_obst = mindist.reshape(-1, N_MESHGRID, N_MESHGRID).detach().cpu().numpy()
     mindist_all = mindist_obst.min(0)
     carr = np.linspace([.1, .1, 1, 1], [1, 1, 1, 1], 256)
     fig = plt.figure(2)
     zero_contour = plt.contour(points_grid[0], points_grid[1], mindist_all, levels=[0], colors='r')
-
+    ker_vis1 = []
+    ker_vis2 = []
+    ker_contours = []
+    ker_val_arr = []
+    ds_h = None
     # Integration parameters
     A = -1 * torch.diag(torch.ones(DOF)).to(**params) #nominal DS
     DS1 = LinDS(q_f)
     DS2 = LinDS(q_0)
+    DS1.lin_thr = 0.1
+    DS2.lin_thr = 0.1
     DS_ARRAY = [DS1, DS2]
 
     N_traj = 100                 # number of trajectories in exploration sampling
@@ -132,6 +146,10 @@ def main_int():
 
     mppi_step.Policy.alpha_s *= 0
     mppi_step.ignored_links = []
+
+    mppi_vis = MPPI(q_0, q_f, dh_params, obs, dt_sim, 1, N_MESHGRID*N_MESHGRID, DS_ARRAY, dh_a, nn_model2, 1)
+    mppi_vis.Policy.alpha_s *= 0
+    mppi_vis.ignored_links = []
 
     best_idx = -1
     t0 = time.time()
@@ -210,6 +228,63 @@ def main_int():
             print(f'Iteration:{N_ITER:4d}, Time:{t_iter:4.2f}, Frequency:{1/t_iter:4.2f},',
                   f' Avg. frequency:{N_ITER/(time.time()-t0):4.2f}',
                   f' Kernel count:{mppi.Policy.n_kernels:4d}')
+
+            ##########################################
+            ### Block to visualize joint space kernels
+            ##########################################
+            # calculate kernel values for heatmaps
+            mppi_vis.Policy.mu_c = mppi_step.Policy.mu_c
+            mppi_vis.Policy.sigma_c = mppi_step.Policy.sigma_c
+            mppi_vis.Policy.alpha_c = mppi_step.Policy.alpha_c
+            mppi_vis.Policy.n_kernels = mppi_step.Policy.n_kernels
+            mppi_vis.Policy.sample_policy()
+
+            mppi_vis.q_cur = q_tens
+
+            trajs_vis, closest_dist_vis, kernel_val_all_vis, dotproducts_all_vis = mppi_vis.propagate()
+            for i in range(mppi_vis.Policy.n_kernels):
+                if len(ker_contours) <= i:
+                    kernel_values = kernel_val_all_vis[:, :, i].reshape(N_MESHGRID, N_MESHGRID)
+                    #kernel_values[closest_dist_vis[:,:,i] < 0] = 0
+                    kernel_values[kernel_values > 0.98] = 1
+                    nrange = 500
+                    carr = np.linspace(np.array([1, 1, 1, 1]), np.array([.46, .67, .18, 1]), nrange)
+                    ker_contours.append(plt.contourf(points_grid[0], points_grid[1], kernel_values,
+                                 levels=nrange,
+                                 cmap=ListedColormap(carr), vmin=0, vmax=1))
+
+            if ds_h is not None:
+                ds_h.lines.remove()
+                #ds_h.arrows.remove()
+                ax = plt.figure(2).axes[0]
+                for i in range(10):
+                    for patch in ax.patches:
+                        if isinstance(patch, mpl.patches.FancyArrowPatch):
+                            patch.remove()
+
+            ds_h = plt.streamplot(points_grid[0][:, 0].numpy(),
+                           points_grid[1][0, :].numpy(),
+                           mppi_vis.qdot[:, 0].reshape(N_MESHGRID, N_MESHGRID).numpy().T,
+                           mppi_vis.qdot[:, 1].reshape(N_MESHGRID, N_MESHGRID).numpy().T,
+                           density=2, color='b', linewidth=0.5, arrowstyle='->')
+            #ker_val_arr
+            # first clean up all existing kernels from plots
+            for i_k in range(len(ker_vis1)):
+                for k_vis in ker_vis1[i_k]:
+                    k_vis.remove()
+                ker_vis2[i_k].remove()
+            ker_vis1 = []
+            ker_vis2 = []
+            # now plot latest policy
+            for i_k in range(mppi_step.Policy.n_kernels):
+                # visualize policy
+                k_c = mppi_step.Policy.mu_c[i_k]
+                k_dir = mppi_step.Policy.alpha_c[i_k]/torch.norm(mppi_step.Policy.alpha_c[i_k])*0.4
+                ker_vis1.append(plt.plot(k_c[0], k_c[1], 'gh', markersize=5))
+                ker_vis2.append(plt.arrow(k_c[0], k_c[1], k_dir[0], k_dir[1], color='g', width=0.05))
+                # ker_vis1[i_k] = plt.plot(k_c[0], k_c[1], 'gh', markersize=5)
+                # ker_vis2[i_k] = plt.arrow(k_c[0], k_c[1], k_dir[0], k_dir[1], color='g', width=0.1)
+
     td = time.time() - t0
     print('Time: ', td)
     print('Time per iteration: ', td / N_ITER, 'Hz: ', 1 / (td / (N_ITER)))

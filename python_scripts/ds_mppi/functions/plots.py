@@ -23,8 +23,8 @@ def init_jpos_plot(xmin, xmax, ymin, ymax):
     ax = fig.add_subplot(111)
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
+    ax.set_xlabel('q_1')
+    ax.set_ylabel('q_2')
     ax.set_aspect('equal')
     rob, = plt.plot([], [], 'o', color=[0, 0.4470, 0.7410], markersize=7)
     plt.ion()
@@ -81,6 +81,8 @@ def plot_obs_init(obstacles):
 def plot_obs_update(o_h, obstacles):
     for i, obstacle in enumerate(obstacles):
         o_h[i].center = obstacle[0:2]
+
+
 
 def init_robot_plot3d(xmin, xmax, ymin, ymax, zmin, zmax, width, color, markersize):
     # Initialize the robot plot
