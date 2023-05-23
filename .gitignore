@@ -61,3 +61,5 @@ python_scripts/mlp_learn/sdf/__pycache__/*
 */.pytest_cache/*
 */screenshots/*
 screenshots/*.png
+*.png
+*.mp4
