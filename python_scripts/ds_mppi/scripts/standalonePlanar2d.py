@@ -60,8 +60,8 @@ def main_int():
     q_f = torch.zeros(DOF).to(**params)
     q_0[0] = torch.pi / 2
     q_f[0] = -torch.pi / 2
-    q_0 = torch.tensor([0,  1.57]).to(**params)
-    q_f = torch.tensor([0, -1.57]).to(**params)
+    q_0 = torch.tensor([-3.14,  0]).to(**params)
+    q_f = torch.tensor([3.14, 0]).to(**params)
 
     # Robot parameters
     dh_a = torch.zeros(DOF + 1).to(**params)
@@ -71,8 +71,10 @@ def main_int():
     # obs = torch.tensor([[5, 1, 0, .5],
     #                     [16, 0, 0, .5],
     #                     [15, -1, 0, .5]]).to(**params)
-    obs = torch.tensor([[6.0, 0.5, 0, .5],[6.0, 0.0, 0, .5],[6.0, -0.5, 0, .5],
-                        [1.5, 1.25, 0, .5]]).to(**params)
+    # obs = torch.tensor([[6.0, 0.5, 0, .5],[6.0, 0.0, 0, .5],[6.0, -0.5, 0, .5],
+    #                     [1.5, 1.25, 0, .5]]).to(**params)
+    obs = torch.tensor([[6.0, 0.0, 0, .5],
+                        [0.0, 4.5, 0, .5]]).to(**params)
 
     n_dummy = 0
     if n_dummy > 0:
@@ -118,7 +120,7 @@ def main_int():
     #primary MPPI to sample naviagtion policy
     mppi = MPPI(q_0, q_f, dh_params, obs, dt, dt_H, N_traj, DS_ARRAY, dh_a, nn_model, 2)
     mppi.Policy.sigma_c_nominal = 0.5
-    mppi.Policy.alpha_s = 3
+    mppi.Policy.alpha_s = 2
     mppi.Policy.policy_upd_rate = 0.5
     mppi.dst_thr = dst_thr/2      # substracted from actual distance (added threshsold)
     mppi.ker_thr = 1e-3         # used to create update mask for policy means

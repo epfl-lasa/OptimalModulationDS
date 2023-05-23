@@ -93,7 +93,7 @@ def update_contour_plot(*args):
     if zero_contour is not None:
         for c in zero_contour.collections:
             c.remove()
-    zero_contour = plt.contour(points_grid[0], points_grid[1], mindist_all, levels=[0], colors='k')
+    zero_contour = plt.contour(points_grid[0], points_grid[1], mindist_all, levels=[0], colors='r')
 
 
 cid = r_h.figure.canvas.mpl_connect('button_press_event', onclick)
