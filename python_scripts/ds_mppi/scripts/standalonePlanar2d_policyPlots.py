@@ -126,7 +126,7 @@ def main_int():
     DS2.lin_thr = 0.05
     DS_ARRAY = [DS1, DS2]
 
-    N_traj = 20                 # number of trajectories in exploration sampling
+    N_traj = 10                 # number of trajectories in exploration sampling
     dt_H = 60                   # horizon length in exploration sampling
     dt = 0.05                    # integration timestep in exploration sampling
     dt_sim = 0.05                # integration timestep for actual robot motion
@@ -147,7 +147,7 @@ def main_int():
     mppi.Policy.alpha_s = 2
     mppi.Policy.policy_upd_rate = 0.5
     mppi.dst_thr = dst_thr/2      # substracted from actual distance (added threshsold)
-    mppi.ker_thr = 1e-3         # used to create update mask for policy means
+    mppi.ker_thr = 1e-1         # used to create update mask for policy means
     mppi.ignored_links = []
     mppi.Cost.q_min = -0.99*3.14*torch.ones(DOF).to(**params)
     mppi.Cost.q_max =  0.99*3.14*torch.ones(DOF).to(**params)

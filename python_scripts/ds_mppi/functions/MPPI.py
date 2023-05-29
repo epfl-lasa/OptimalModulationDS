@@ -332,7 +332,9 @@ class MPPI:
         beta = self.cur_cost.mean() / 50
         w = torch.exp(-1 / beta * self.cur_cost)
         w = w / w.sum()
-        max_kernel_activation_each = self.kernel_val_all[:, :, 0:self.Policy.n_kernels].max(dim=1)[0]
+        #max_kernel_activation_each = self.kernel_val_all[:, :, 0:self.Policy.n_kernels].max(dim=1)[0]
+        max_kernel_activation_each = (self.kernel_val_all[:, :, 0:self.Policy.n_kernels] * self.kernel_activations.unsqueeze(-1)).max(dim=1)[0]
+
         mean_kernel_activation_all = max_kernel_activation_each.mean(dim=0)
         update_mask = mean_kernel_activation_all > self.ker_thr
         print(f'Updating {sum(update_mask)} kernels!')

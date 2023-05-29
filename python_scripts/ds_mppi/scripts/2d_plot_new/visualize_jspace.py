@@ -49,11 +49,19 @@ nn_model.update_aot_lambda()
 
 
 def update_plot(*args):
-    jspace = torch.tensor([slider1.get(), slider2.get()]).to(torch.float32)
+    #jspace = torch.tensor([slider1.get(), slider2.get()]).to(torch.float32)
+    jspace = torch.tensor(np.deg2rad([slider1.get(), slider2.get()])).to(torch.float32)
+
     cur_fk, _ = numeric_fk_model(jspace, dh_params, 10)
     upd_r_h(cur_fk.to('cpu'), r_h)
     upd_jpos_plot(jspace, jpos_h)
     print('Current joint state: ', jspace)
+
+def reset_plot(*args):
+    slider1.set(0)
+    slider2.set(0)
+    update_plot()
+
 def onclick(event):
     global obs, o_h
     if event.xdata > -10 and event.xdata < 10 and event.ydata > -10 and event.ydata < 10:
@@ -98,13 +106,27 @@ def update_contour_plot(*args):
 
 cid = r_h.figure.canvas.mpl_connect('button_press_event', onclick)
 root = tk.Tk()
-root.title("Joint State")
+root.title("Control Panel")
 root.geometry('+1900+700')
-slider1 = tk.Scale(root, from_=-np.pi, to=np.pi, length=600,
-                   resolution=0.01, tickinterval=np.pi/5, orient=tk.HORIZONTAL, command=update_plot)
-slider1.grid(row=1, column=0)
-slider2 = tk.Scale(root, from_=-np.pi, to=np.pi, length=600,
-                   resolution=0.01, tickinterval=np.pi/5, orient=tk.HORIZONTAL, command=update_plot)
-slider2.grid(row=2, column=0)
+root.configure(bg='white')
+label0 = tk.Label(root, text=" ", bg='white')
+label0.grid(row=0, column=0)  # position the label
+label0 = tk.Label(root, text="Control Panel", bg='white')
+label0.grid(row=1, column=0)  # position the label
+label0.bind("<Button-1>", reset_plot)
+label1 = tk.Label(root, text="Joint 1, deg", bg='white')
+label1.grid(row=2, column=0)  # position the label
+
+slider1 = tk.Scale(root, from_=180, to=-180, length=400,
+                   resolution=1, tickinterval=-30, orient=tk.VERTICAL, command=update_plot,
+                   bg='white', troughcolor='#edf9ff', sliderrelief='groove', showvalue=0)
+slider1.grid(row=3, column=0)
+label2 = tk.Label(root, text="Joint 2, deg", bg='white')
+label2.grid(row=2, column=1)  # position the label
+slider2 = tk.Scale(root, from_=180, to=-180, length=400,
+                   resolution=1, tickinterval=-30, orient=tk.VERTICAL, command=update_plot,
+                   bg='white', troughcolor='#edf9ff', sliderrelief='groove', showvalue=0)
+#flat, groove, raised, ridge, solid, or sunken
+slider2.grid(row=3, column=1)
 update_plot()
 root.mainloop()
