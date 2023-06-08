@@ -1,4 +1,5 @@
 # OptimalModulationDS
+Full Supplementary Video showcasing method explanation, simulation & real robot application:
 [![Full Supplementary Video](http://img.youtube.com/vi/PmbGwdXiWOc/0.jpg)](https://www.youtube.com/watch?v=PmbGwdXiWOc)
 
 Standard Modulated Dynamical System
