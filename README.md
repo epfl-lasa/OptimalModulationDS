@@ -1,5 +1,8 @@
 # OptimalModulationDS
 
-![Modulated Dynamical System](https://github.com/epfl-lasa/OptimalModulationDS/assets/22716499/1856d5e6-7dd5-4bbf-9a57-232057d33eab)
+![Standard Modulated Dynamical System](https://github.com/epfl-lasa/OptimalModulationDS/assets/22716499/1350e3e4-c0d4-47fd-9700-186dd911f53a)
 
-![Proposed Method](https://github.com/epfl-lasa/OptimalModulationDS/assets/22716499/4ef7c7b3-161a-48ab-a205-05e6e42a61de)
+![Proposed method](https://github.com/epfl-lasa/OptimalModulationDS/assets/22716499/141867f3-3562-4abf-9efb-2aea109cc260)
+
+
+[![Full Supplementary Video](http://img.youtube.com/vi/PmbGwdXiWOc/0.jpg)](https://www.youtube.com/watch?v=PmbGwdXiWOc)
