@@ -112,7 +112,7 @@ class MPPI:
                 # evaluate NN. Calculate kernel bases on first iteration
                 distance, self.nn_grad = self.distance_repulsion_nn(q_prev, aot=True)
                 self.nn_grad = self.nn_grad[0:self.N_traj, :]               # fixes issue with aot_function cache
-                # distance, self.nn_grad = self.distance_repulsion_fk(q_prev) #not implemented for Franka
+                #distance, self.nn_grad = self.distance_repulsion_fk(q_prev) #not implemented for Franka
 
                 distance -= self.dst_thr
                 self.closest_dist_all[:, i - 1] = distance[0:self.N_traj]

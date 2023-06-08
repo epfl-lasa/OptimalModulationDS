@@ -66,7 +66,7 @@ def main_int():
     dh_params = torch.vstack((dh_a * 0, dh_a * 0, dh_a, dh_a * 0)).T
     # Obstacle spheres (x, y, z, r)
     obs = torch.tensor([[6, 2, 0, .5],
-                        [2., -1, 0, .5],
+                        [4., -1, 0, .5],
                         [5, 0, 0, .5]]).to(**params)
     n_dummy = 1
     dummy_obs = torch.hstack((torch.zeros(n_dummy, 3)+6, torch.zeros(n_dummy, 1)+0.1)).to(**params)
@@ -81,15 +81,15 @@ def main_int():
     DS2 = LinDS(q_0)
     DS_ARRAY = [DS1, DS2]
 
-    N_traj = 100                 # number of trajectories in exploration sampling
+    N_traj = 20                 # number of trajectories in exploration sampling
     dt_H = 10                   # horizon length in exploration sampling
     dt = 0.3                    # integration timestep in exploration sampling
-    dt_sim = 0.1                # integration timestep for actual robot motion
+    dt_sim = 0.02                # integration timestep for actual robot motion
 
     N_ITER = 0
     # kernel adding thresholds
     dst_thr = 0.5               # distance to collision (everything below - adds a kernel)
-    thr_rbf_add = 0.05          # distance to closest kernel (l2 norm of 7d vector difference)
+    thr_rbf_add = 0.2          # distance to closest kernel (l2 norm of 7d vector difference)
     thr_dot_add = -0.9
 
     #primary MPPI to sample naviagtion policy
@@ -105,6 +105,7 @@ def main_int():
     mppi_step = MPPI(q_0, q_f, dh_params, obs, dt_sim, 1, 1, DS_ARRAY, dh_a, nn_model, 1)
     mppi_step.Policy.alpha_s *= 0
     mppi_step.ignored_links = []
+    mppi_step.dst_thr = 1
 
     best_idx = -1
     t0 = time.time()
@@ -165,7 +166,7 @@ def main_int():
             mppi.q_cur = mppi.q_cur + mppi_step.qdot[0, :] * dt_sim
             #print(mppi.qdot[best_idx, :] - mppi_step.qdot[0, :])
             cur_fk, _ = numeric_fk_model(mppi.q_cur, dh_params, 10)
-            upd_r_h(cur_fk.to('cpu'), r_h)
+            #upd_r_h(cur_fk.to('cpu'), r_h)
             r_h.set_zorder(1000)
             # obs[0, 0] += 0.03
             # plot_obs_update(o_h_arr, obs)
@@ -175,13 +176,15 @@ def main_int():
                 torch_profiler.step()
             if N_ITER > 10000:
                 break
-            if N_ITER == 4:
+            if N_ITER == 10:
                 t0 = time.time()
             # print(q_cur)
             t_iter = time.time() - t_iter
             print(f'Iteration:{N_ITER:4d}, Time:{t_iter:4.2f}, Frequency:{1/t_iter:4.2f},',
-                  f' Avg. frequency:{N_ITER/(time.time()-t0):4.2f}',
+                  f' Avg. frequency:{(N_ITER-10)/(time.time()-t0):4.2f}',
                   f' Kernel count:{mppi.Policy.n_kernels:4d}')
+            #plt.savefig(f'../screenshots/mppi_7d/ts_{N_ITER:04d}.png', dpi=300, bbox_inches='tight')
+
     td = time.time() - t0
     print('Time: ', td)
     print('Time per iteration: ', td / N_ITER, 'Hz: ', 1 / (td / (N_ITER)))

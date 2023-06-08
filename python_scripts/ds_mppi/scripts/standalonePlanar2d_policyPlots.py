@@ -133,7 +133,7 @@ def main_int():
     plt.figure(2)
     traj_h = []
     for i in range(N_traj):
-        traj_h.append(plt.plot([], [], '-', color=[0.3010, 0.7450, 0.9330], linewidth=0.5))
+        traj_h.append(plt.plot([], [], '-', color=[0.3010, 0.7450, 0.9330], linewidth=1.5))
     N_ITER = 0
     # kernel adding thresholds
     dst_thr = 0.5               # distance to collision (everything below - adds a kernel)
@@ -284,7 +284,7 @@ def main_int():
                                points_grid[1][0, :].numpy(),
                                mppi_vis.qdot[:, 0].reshape(N_MESHGRID, N_MESHGRID).numpy().T,
                                mppi_vis.qdot[:, 1].reshape(N_MESHGRID, N_MESHGRID).numpy().T,
-                               density=1.5, color='b', linewidth=0.5, arrowstyle='->', zorder=1)
+                               density=1, color='b', linewidth=0.3, arrowstyle='->', zorder=1, broken_streamlines=True)
                                # minlength=0.1, maxlength = 3, broken_streamlines=True)
 
             #ker_val_arr
@@ -305,9 +305,15 @@ def main_int():
                 # ker_vis1[i_k] = plt.plot(k_c[0], k_c[1], 'gh', markersize=5)
                 # ker_vis2[i_k] = plt.arrow(k_c[0], k_c[1], k_dir[0], k_dir[1], color='g', width=0.1)
             plt.figure(1)
-            plt.savefig(f'../screenshots/2d_jspace/mppi/2d_ts_{N_ITER:04d}.png', dpi=300)
+            plt.savefig(f'../screenshots/2d_jspace/mppi_new1/2d_ts_{N_ITER:04d}.png', dpi=300)
             plt.figure(2)
-            plt.savefig(f'../screenshots/2d_jspace/mppi/2d_js_{N_ITER:04d}.png', dpi=300)
+            plt.savefig(f'../screenshots/2d_jspace/mppi_new1/2d_js_{N_ITER:04d}.png', dpi=300)
+            # data = {'n_kernels': mppi.Policy.n_kernels,
+            #         'mu_c': mppi.Policy.mu_c[0:mppi.Policy.n_kernels],
+            #         'alpha_c': mppi.Policy.alpha_c[0:mppi.Policy.n_kernels],
+            #         'sigma_c': mppi.Policy.sigma_c[0:mppi.Policy.n_kernels],
+            #         'norm_basis': mppi.Policy.kernel_obstacle_bases[0:mppi.Policy.n_kernels]}
+            # torch.save(data, 'toy_policy2.pt')
 
     td = time.time() - t0
     print('Time: ', td)

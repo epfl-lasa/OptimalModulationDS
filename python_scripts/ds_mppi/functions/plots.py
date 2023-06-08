@@ -37,7 +37,7 @@ def init_kernel_means(n_kernel_max):
     c_h = []
     for i in range(n_kernel_max):
         # tmp, = plt.plot([], [], '-o', color=[0, 0.60, 0.90], markersize=2, linewidth=.5)
-        tmp, = plt.plot([], [], '-o', color='g', markersize=2, linewidth=.5)
+        tmp, = plt.plot([], [], '-o', color='g', markersize=2, linewidth=1.5)
 
         c_h.append(tmp)
     return c_h
