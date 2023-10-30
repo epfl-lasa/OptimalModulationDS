@@ -80,6 +80,28 @@ def main_loop():
         sphere_down = sphere - torch.tensor([0, 0, length, 0])
         line_down = sphere + torch.linspace(0, 1, n_down).reshape(-1, 1) * (sphere_down - sphere)
         wall = torch.vstack((wall, line_down))
+
+    ########################################
+    ### shelf
+    ########################################
+    r = 0.05
+    n_pts = 8
+    length = max(1, 2*n_pts-2)*r
+    z0 = 0.25
+    x0 = 0.4
+    y0 = 0
+    posA = torch.tensor([x0, y0, z0+length, r])
+    posB = posA + torch.tensor([length, 0.0, 0.0, 0.0])
+    line = posA + torch.linspace(0, 1, n_pts).reshape(-1, 1) * (posB - posA)
+    shelf = line
+    for sphere in line:
+        sphere_down = sphere - torch.tensor([0, 0, length, 0])
+        line_down = sphere + torch.linspace(0, 1, n_pts).reshape(-1, 1) * (sphere_down - sphere)
+        sphere_left = sphere + torch.tensor([0, -length/2, -length/2, 0])
+        sphere_right = sphere + torch.tensor([0, length/2, -length/2, 0])
+        line_lr = sphere_left + torch.linspace(0, 1, n_pts).reshape(-1, 1) * (sphere_right - sphere_left)
+        shelf = torch.vstack((shelf, line_down, line_lr))
+
     ########################################
     ### Dummy obstacle
     ########################################
@@ -103,6 +125,8 @@ def main_loop():
             obs = wall
         elif config["collision_model"]["obstacle"] == 'line':
             obs = line
+        elif config["collision_model"]["obstacle"] == 'shelf':
+            obs = shelf
         else:
             obs = torch.tensor([[10.3, 0.0, 0.0, 0.01]])
         t_run = time.time() - t_0
