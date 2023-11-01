@@ -117,7 +117,7 @@ def main_loop():
         socket_send_state.send_pyobj(state_dict)
         N_ITER_TOTAL += 1
         N_ITER_TRAJ += 1
-
+        print(q_des)
         status_msg = ''
         t_traj = time.time() - t_traj_start
         if (torch.norm(mppi_step.q_cur - mppi_step.qf) < 0.1) and (N_ITER_TRAJ > 100):
