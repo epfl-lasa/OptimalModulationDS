@@ -85,10 +85,10 @@ def main_loop():
     ### shelf
     ########################################
     r = 0.03
-    n_pts = 10
+    n_pts = 9
     length = max(1, 2*n_pts-2)*r*1.5
     z0 = 0.1
-    x0 = 02.4
+    x0 = 0.5
     y0 = 0
     posA = torch.tensor([x0, y0, z0+length, r])
     posB = posA + torch.tensor([length, 0.0, 0.0, 0.0])
