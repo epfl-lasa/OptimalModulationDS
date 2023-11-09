@@ -133,7 +133,9 @@ def main_loop():
             # else:
             #     mppi_step.reset_DS(DS2)
             print('Switching DS!!')
-            mppi_step.switch_DS_idx(N_SUCCESS % 4)
+            # mppi_step.switch_DS_idx(N_SUCCESS % 4)
+            mppi_step.switch_DS_idx(np.random.randint(4))
+
             # socket_send_state.send_pyobj(mppi_step.q_cur)
             status = f'1: Goal reached in {N_ITER_TRAJ:3d} iterations ({t_traj:4.2f} seconds). ' \
                      f'Obs: {obstacles_data.shape[0]}, Top obs: {obstacles_data[0]}'
