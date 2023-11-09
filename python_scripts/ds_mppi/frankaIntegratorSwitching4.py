@@ -55,6 +55,10 @@ def main_loop():
     # Initial state
     q_0 = torch.tensor(config['general']['q_0']).to(**params)
     q_f = torch.tensor(config['general']['q_f']).to(**params)
+    q_1 = torch.tensor(config['general']['top_left']).to(**params)
+    q_2 = torch.tensor(config['general']['top_right']).to(**params)
+    q_3 = torch.tensor(config['general']['bottom_right']).to(**params)
+    q_4 = torch.tensor(config['general']['bottom_left']).to(**params)
 
     # Robot parameters
     dh_a = torch.tensor([0, 0, 0, 0.0825, -0.0825, 0, 0.088, 0])        # "r" in matlab
@@ -64,10 +68,13 @@ def main_loop():
 
     # Integration parameters
     A = -1 * torch.diag(torch.ones(DOF)).to(**params)
-    DS1 = LinDS(q_f)
-    DS2 = LinDS(q_0)
-
-    DS_ARRAY = [DS1, DS2]
+    # DS1 = LinDS(q_f)
+    # DS2 = LinDS(q_0)
+    DS1 = LinDS(q_1)
+    DS2 = LinDS(q_2)
+    DS3 = LinDS(q_3)
+    DS4 = LinDS(q_4)
+    DS_ARRAY = [DS1, DS2, DS3, DS4]
 
     #DS1 = SEDS('content/seds_right.mat', q_0.unsqueeze(1))
     #DS2 = SEDS('content/seds_left.mat', q_f.unsqueeze(1))
@@ -126,7 +133,9 @@ def main_loop():
             # else:
             #     mppi_step.reset_DS(DS2)
             print('Switching DS!!')
-            mppi_step.switch_DS_idx(N_SUCCESS % 2)
+            # mppi_step.switch_DS_idx(N_SUCCESS % 4)
+            mppi_step.switch_DS_idx(np.random.randint(4))
+
             # socket_send_state.send_pyobj(mppi_step.q_cur)
             status = f'1: Goal reached in {N_ITER_TRAJ:3d} iterations ({t_traj:4.2f} seconds). ' \
                      f'Obs: {obstacles_data.shape[0]}, Top obs: {obstacles_data[0]}'

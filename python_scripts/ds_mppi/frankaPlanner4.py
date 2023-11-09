@@ -53,6 +53,10 @@ def main_loop():
     # Initial state
     q_0 = torch.tensor(config['general']['q_0']).to(**params)
     q_f = torch.tensor(config['general']['q_f']).to(**params)
+    q_1 = torch.tensor(config['general']['top_left']).to(**params)
+    q_2 = torch.tensor(config['general']['top_right']).to(**params)
+    q_3 = torch.tensor(config['general']['bottom_right']).to(**params)
+    q_4 = torch.tensor(config['general']['bottom_left']).to(**params)
 
     # Robot parameters
     dh_a = torch.tensor([0, 0, 0, 0.0825, -0.0825, 0, 0.088, 0])        # "r" in matlab
@@ -62,9 +66,11 @@ def main_loop():
 
     # Integration parameters
     A = -1 * torch.diag(torch.ones(DOF)).to(**params)
-    DS1 = LinDS(q_f)
-    DS2 = LinDS(q_0)
-    DS_ARRAY = [DS1, DS2]
+    DS1 = LinDS(q_1)
+    DS2 = LinDS(q_2)
+    DS3 = LinDS(q_3)
+    DS4 = LinDS(q_4)
+    DS_ARRAY = [DS1, DS2, DS3, DS4]
 
     N_traj = config['planner']['n_trajectories']
     dt_H = config['planner']['horizon']

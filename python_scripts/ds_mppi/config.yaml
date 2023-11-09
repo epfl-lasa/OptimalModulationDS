@@ -1,8 +1,7 @@
 collision_model:
   fname: "franka_collision_model.pt"
   closest_spheres: 5
-  obstacle: "tshape"
-
+  obstacle: "shelf"  #ring, tshape, wall, line, shelf
 general:
   # Initial state
   ## for left-right reaching
@@ -19,8 +18,18 @@ general:
   #q_f: [ 0.0255,    0.6303,         0,   -1.0719,    0.0255,    2.8675,         0 ]
 
   # for paper left-right
-  q_0: [-1.57,  0.40000,  0.0000, -1.2708,  0.0000,  1.8675,  0.0000]
-  q_f: [ 1.57,  0.40000,  0.0000, -1.2708,  0.0000,  1.8675,  0.0000]
+#  q_0: [-1.57,  0.40000,  0.0000, -1.2708,  0.0000,  1.8675,  0.0000]
+#  q_f: [ 1.57,  0.40000,  0.0000, -1.2708,  0.0000,  1.8675,  0.0000]
+
+  # for shelf env sim
+  # if looking from behind the robot
+  top_right: [-0.88, 0.38, 0.5, -1, 0.45, 1.9, 0.31]
+  top_left: [1.2, 0.5, -1.5, -1, 0.45, 1.9, 0.03]
+  bottom_right: [-1.24, 1.53, 1.22, -1.21, -0.21, 1.55, 0.08]
+  bottom_left: [1.2, 1.66, -1.58, -1.15, 0.53, 1.69, -0.75]
+  q_0: [-0.88, 0.38, 0.5, -1, 0.45, 1.9, 0.31]
+  q_f: [-1.24, 1.53, 1.22, -1.21, -0.21, 1.55, 0.08]
+
 
 zmq:
   # ZMQ params

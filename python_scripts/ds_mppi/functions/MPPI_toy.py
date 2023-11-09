@@ -53,7 +53,7 @@ class MPPI:
         self.Cost = Cost(self.qf, self.dh_params)
         self.traj_range = torch.arange(self.N_traj).to(**self.tensor_args).to(torch.long)
         self.policy_upd_rate = 0.1
-        self.dst_thr = 0.5
+        self.dst_thr = 0.1
         self.qdot = torch.zeros((self.N_traj, self.n_dof)).to(**self.tensor_args)
         self.ker_thr = 1e-3
         self.ignored_links = [0, 1, 2]
@@ -123,8 +123,8 @@ class MPPI:
                 # calculate own modulation coefficients
                 if 1:
                     # for planar robot (units)
-                    dist_low, dist_high = 0.0, 2.5
-                    k_sigmoid = 3
+                    dist_low, dist_high = 0.0, 0.5
+                    k_sigmoid = 30
                 else:
                     # for franka robot (meters)
                     dist_low, dist_high = 0.03, 0.1
@@ -133,6 +133,7 @@ class MPPI:
                 ltau_min, ltau_max = 1, 3
                 l_n = generalized_sigmoid(distance, ln_min, ln_max, dist_low, dist_high, k_sigmoid)
                 l_n_vel = l_vel * 1 + (1 - l_vel) * l_n
+                #l_n_vel = l_n
                 l_tau = generalized_sigmoid(distance, ltau_max, ltau_min, dist_low, dist_high, k_sigmoid)
                 # self.D = self.D * 0 + torch.eye(self.n_dof).to(**self.tensor_args)
                 # self.D = l_tau[:, None, None] * self.D

@@ -48,6 +48,7 @@ class MPPI:
         self.nn_grad = torch.zeros(N_traj, self.n_dof).to(**self.tensor_args)
         self.norm_basis = torch.zeros((self.N_traj, dt_H, self.n_dof, self.n_dof)).to(**self.tensor_args)
         self.dot_products = torch.zeros((self.N_traj, dt_H)).to(**self.tensor_args)
+        self.kernel_activations = torch.zeros((self.N_traj, dt_H)).to(**self.tensor_args)
 
         self.basis_eye = torch.eye(self.n_dof).repeat(N_traj, 1).reshape(N_traj, self.n_dof, self.n_dof).to(**self.tensor_args).cpu()
         self.basis_eye_temp = (self.basis_eye * 0).to(**self.tensor_args).cpu()
@@ -67,7 +68,7 @@ class MPPI:
 
         for tmp in range(5):
             self.Policy.sample_policy()
-            _, _, _, _ = self.propagate()
+            _, _, _, _, _ = self.propagate()
             numeric_fk_model(self.q_cur, dh_params, 10)
             print(f'warmup run #{tmp+1} done')
 
@@ -87,6 +88,8 @@ class MPPI:
         self.closest_dist_all = 100 + self.closest_dist_all * 0
         self.kernel_val_all = self.kernel_val_all * 0
         self.dot_products = self.dot_products * 0
+        self.kernel_activations = self.kernel_activations * 0
+
     def build_nn_input(self, q_tens, obs_tens):
         self.nn_input = torch.hstack((q_tens.tile(obs_tens.shape[0], 1), obs_tens.repeat_interleave(q_tens.shape[0], 0)))
         return self.nn_input
@@ -109,7 +112,7 @@ class MPPI:
                 # evaluate NN. Calculate kernel bases on first iteration
                 distance, self.nn_grad = self.distance_repulsion_nn(q_prev, aot=True)
                 self.nn_grad = self.nn_grad[0:self.N_traj, :]               # fixes issue with aot_function cache
-                # distance, self.nn_grad = self.distance_repulsion_fk(q_prev) #not implemented for Franka
+                #distance, self.nn_grad = self.distance_repulsion_fk(q_prev) #not implemented for Franka
 
                 distance -= self.dst_thr
                 self.closest_dist_all[:, i - 1] = distance[0:self.N_traj]
@@ -125,7 +128,9 @@ class MPPI:
 
                 dotproduct = (E[:, :, 0] * nominal_velocity_normalized).sum(dim=-1)
                 self.dot_products[:, i-1] = dotproduct
-                l_vel = generalized_sigmoid(dotproduct, 0, 1, -0.2, 0.0, 100)
+                #l_vel = generalized_sigmoid(dotproduct, 0, 1, -0.2, 0.0, 100)
+                l_vel = generalized_sigmoid(dotproduct, 0, 1, -1, -0.75, 10)
+
             with record_function("TAG: Modulation-propagation"):
                 # calculate standard modulation coefficients
                 # gamma = distance + 1
@@ -135,16 +140,16 @@ class MPPI:
                 # l_n[l_n < 0] = 0
                 # l_tau[l_tau < 1] = 1
                 # calculate own modulation coefficients
-                if 0:
+                if 1:
                     # for planar robot (units)
-                    dist_low, dist_high = 0.0, 2.5
+                    dist_low, dist_high = 0.0, 2
                     k_sigmoid = 3
                 else:
                     # for franka robot (meters)
                     dist_low, dist_high = 0.03, 0.1
                     k_sigmoid = 100
                 ln_min, ln_max = 0, 1
-                ltau_min, ltau_max = 1, 3
+                ltau_min, ltau_max = 1, 5
                 l_n = generalized_sigmoid(distance, ln_min, ln_max, dist_low, dist_high, k_sigmoid)
                 l_n_vel = l_vel * 1 + (1 - l_vel) * l_n
                 l_tau = generalized_sigmoid(distance, ltau_max, ltau_min, dist_low, dist_high, k_sigmoid)
@@ -187,7 +192,9 @@ class MPPI:
                 velocity_activation = (1-l_vel[:, None])
                 goal_activation = (q_prev-self.qf).norm(p=0.5, dim=1).clamp(0, 1).unsqueeze(1)
                 goal_activation[goal_activation < 0.3] = 0
-                policy_velocity = collision_activation * velocity_activation * goal_activation * policy_value
+                total_activation = collision_activation * velocity_activation * goal_activation
+                self.kernel_activations[:, i-1] = total_activation.squeeze(1)
+                policy_velocity = total_activation * policy_value
                 # policy_velocity = velocity_activation * policy_value
                 # if self.N_traj == 1:
                 #     print(collision_activation.item(), velocity_activation.item())
@@ -206,7 +213,7 @@ class MPPI:
                 mod_velocity = torch.nan_to_num(mod_velocity / mod_velocity_norm)
                 # slow down and repulsion for collision case
                 mod_velocity[distance < 0] *= 0.1
-                repulsion_velocity = E[:, :, 0] * nominal_velocity_norm*0.2
+                repulsion_velocity = E[:, :, 0] * nominal_velocity_norm*0.1
                 mod_velocity[distance < 0] += repulsion_velocity[distance < 0]
             with record_function("TAG: Propagate"):
                 # propagate
@@ -214,7 +221,7 @@ class MPPI:
                     self.all_traj[:, i, :] = self.all_traj[:, i - 1, :] + self.dt * mod_velocity
                 if i == 1:
                     self.qdot = mod_velocity
-        return self.all_traj, self.closest_dist_all, self.kernel_val_all[:, :, 0:P.n_kernels], self.dot_products
+        return self.all_traj, self.closest_dist_all, self.kernel_val_all[:, :, 0:P.n_kernels], self.dot_products, self.kernel_activations
 
 
     def distance_repulsion_nn(self, q_prev, aot=False):
@@ -325,7 +332,9 @@ class MPPI:
         beta = self.cur_cost.mean() / 50
         w = torch.exp(-1 / beta * self.cur_cost)
         w = w / w.sum()
-        max_kernel_activation_each = self.kernel_val_all[:, :, 0:self.Policy.n_kernels].max(dim=1)[0]
+        #max_kernel_activation_each = self.kernel_val_all[:, :, 0:self.Policy.n_kernels].max(dim=1)[0]
+        max_kernel_activation_each = (self.kernel_val_all[:, :, 0:self.Policy.n_kernels] * self.kernel_activations.unsqueeze(-1)).max(dim=1)[0]
+
         mean_kernel_activation_all = max_kernel_activation_each.mean(dim=0)
         update_mask = mean_kernel_activation_all > self.ker_thr
         print(f'Updating {sum(update_mask)} kernels!')
