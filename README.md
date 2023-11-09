@@ -23,4 +23,5 @@ Standard Modulated Dynamical System
 Proposed method
 ![Proposed method](https://github.com/epfl-lasa/OptimalModulationDS/assets/22716499/141867f3-3562-4abf-9efb-2aea109cc260)
 
-
+## Franka simulation in shelf-liek environment
+![shelf_anim](https://github.com/epfl-lasa/OptimalModulationDS/assets/22716499/f82c028c-2361-473c-b6c4-4cb73352b561)
