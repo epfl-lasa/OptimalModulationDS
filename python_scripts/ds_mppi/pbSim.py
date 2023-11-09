@@ -26,7 +26,7 @@ def main_loop():
     p.configureDebugVisualizer(lightPosition=[5, 5, 5])
     p.setPhysicsEngineParameter(maxNumCmdPer1ms=1000)
     #p.resetDebugVisualizerCamera(cameraDistance=1.5, cameraYaw=110, cameraPitch=-10, cameraTargetPosition=[0, 0, 0.5])
-    p.resetDebugVisualizerCamera(cameraDistance=1.5, cameraYaw=110, cameraPitch=-25, cameraTargetPosition=[0, 0, 0.5])
+    p.resetDebugVisualizerCamera(cameraDistance=1.5, cameraYaw=90, cameraPitch=0, cameraTargetPosition=[0, 0, 0.5])
 
     p.setAdditionalSearchPath(pd.getDataPath())
     timeStep = 0.01
@@ -73,7 +73,7 @@ def main_loop():
 
         # [ZMQ] Receive policy from planner
         policy_data, policy_recv_status = zmq_try_recv(policy_data, socket_receive_policy)
-        if policy_recv_status and 1:
+        if policy_recv_status and 0:
             kernel_manager.update_kernels(policy_data, 'kernel_fk')
             #trajectory_manager.delete_kernels() #also deletes navigation kernels
             #trajectory_manager.update_kernels(policy_data, 'best_traj_fk')

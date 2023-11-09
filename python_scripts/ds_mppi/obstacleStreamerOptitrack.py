@@ -106,10 +106,10 @@ def main_loop():
     socket_send_obs = init_publisher(context, '*', config["zmq"]["obstacle_port"])
 
     # socket to receive data from optitrack (pc1)
-    # socket_receive_optitrack = init_subscriber(context, '128.178.145.79', 5511)
+    socket_receive_optitrack = init_subscriber(context, '128.178.145.79', 5511)
 
     # socket to receive data from optitrack (pc2)
-    socket_receive_optitrack = init_subscriber(context, '128.178.145.5', 5511)
+    # socket_receive_optitrack = init_subscriber(context, '128.178.145.5', 5511)
 
     freq = config["obstacle_streamer"]["frequency"]
     t_0 = time.time()
@@ -156,7 +156,7 @@ def main_loop():
             #print(bodies)
             # if len(bodies) > 0:
             if len(bodies) > 0:
-                if 1:
+                if 0:
                     human_dict, human_spheres = get_human_pos(bodies, human_dict)
                     n_sph = len(human_spheres)
                     if n_sph > 0:

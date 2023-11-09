@@ -1,0 +1,1 @@
+1: Goal reached in 310 iterations (0.43 seconds). Obs: 1, Top obs: tensor([   10.3000,     0.0000,     0.0000,     0.0100])

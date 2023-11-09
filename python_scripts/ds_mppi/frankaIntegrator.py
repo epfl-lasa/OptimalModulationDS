@@ -126,9 +126,9 @@ def main_loop():
         status_msg = ''
         t_traj = time.time() - t_traj_start
 
-        if torch.norm(mppi_step.q_cur - mppi_step.qf) < 0.1:
+        if torch.norm(mppi_step.q_cur - mppi_step.qf) < 0.05:
             # mppi_step.switch_DS_idx(N_SUCCESS % 2)
-
+            time.sleep(2)
             mppi_step.q_cur = q_0
             state_dict = {'q': mppi_step.q_cur, 'dq': mppi_step.q_cur*0, 'ds_idx': N_SUCCESS % 2}
             socket_send_state.send_pyobj(state_dict)

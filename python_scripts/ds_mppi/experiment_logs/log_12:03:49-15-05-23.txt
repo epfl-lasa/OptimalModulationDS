@@ -1,0 +1,2 @@
+0: Goal not reached in 5465 iterations (10.00 seconds). Obs: 60, Top obs: tensor([ 0.4000, -0.4000,  0.8996,  0.0500])
+0: Goal not reached in 5467 iterations (10.00 seconds). Obs: 60, Top obs: tensor([ 0.4000, -0.4000,  0.8602,  0.0500])
