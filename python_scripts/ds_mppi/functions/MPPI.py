@@ -129,7 +129,7 @@ class MPPI:
                 dotproduct = (E[:, :, 0] * nominal_velocity_normalized).sum(dim=-1)
                 self.dot_products[:, i-1] = dotproduct
                 #l_vel = generalized_sigmoid(dotproduct, 0, 1, -0.2, 0.0, 100)
-                l_vel = generalized_sigmoid(dotproduct, 0, 1, -1, -0.75, 10)
+                l_vel = generalized_sigmoid(dotproduct, 0, 1, -1, -0.25, 10)
 
             with record_function("TAG: Modulation-propagation"):
                 # calculate standard modulation coefficients
@@ -191,7 +191,7 @@ class MPPI:
                 collision_activation = (1-l_n[:, None])
                 velocity_activation = (1-l_vel[:, None])
                 goal_activation = (q_prev-self.qf).norm(p=0.5, dim=1).clamp(0, 1).unsqueeze(1)
-                goal_activation[goal_activation < 0.3] = 0
+                goal_activation[goal_activation < 0.5] = 0
                 total_activation = collision_activation * velocity_activation * goal_activation
                 self.kernel_activations[:, i-1] = total_activation.squeeze(1)
                 policy_velocity = total_activation * policy_value

@@ -75,7 +75,7 @@ def main_loop():
     DS3 = LinDS(q_3)
     DS4 = LinDS(q_4)
     DS_ARRAY = [DS1, DS2, DS3, DS4]
-    ds_order = [1,1,1,0,0,0,3,3,3,0,0,0,1,1,1,2,2,2]*5000
+    ds_order = [0,0,0,3,3,3,0,0,0,1,1,1,2,2,2,1,1,1]*5000
     #DS1 = SEDS('content/seds_right.mat', q_0.unsqueeze(1))
     #DS2 = SEDS('content/seds_left.mat', q_f.unsqueeze(1))
 
