@@ -85,14 +85,14 @@ def main_loop():
     ### shelf
     ########################################
     r = 0.03
-    n_pts = 9
+    n_pts = 12
     length = max(1, 2*n_pts-2)*r*1.5
     z0 = 0.15
     x0 = 0.4
     y0 = 0
     posA = torch.tensor([x0, y0, z0+length, r])
-    posB = posA + torch.tensor([length, 0.0, 0.0, 0.0])
-    line = posA + torch.linspace(0, 1, n_pts).reshape(-1, 1) * (posB - posA)
+    posB = posA + torch.tensor([length/3, 0.0, 0.0, 0.0])
+    line = posA + torch.linspace(0, 1, n_pts//2).reshape(-1, 1) * (posB - posA)
     shelf = line
     for sphere in line:
         sphere_down = sphere - torch.tensor([0, 0, length, 0])
