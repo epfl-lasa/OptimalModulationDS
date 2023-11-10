@@ -45,7 +45,7 @@ planner:
   collision_threshold: 0.01
 
   # navigation kernel params
-  kernel_width: 1  # higher numbers for larger RBF area
+  kernel_width: 1  # lower numbers for smaller RBF area
   kernel_p: 2
   alpha_sampling_sigma: 3
   policy_update_rate: 0.5
