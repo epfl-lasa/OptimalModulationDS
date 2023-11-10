@@ -166,7 +166,7 @@ def main_int():
             mppi.q_cur = mppi.q_cur + mppi_step.qdot[0, :] * dt_sim
             #print(mppi.qdot[best_idx, :] - mppi_step.qdot[0, :])
             cur_fk, _ = numeric_fk_model(mppi.q_cur, dh_params, 10)
-            #upd_r_h(cur_fk.to('cpu'), r_h)
+            upd_r_h(cur_fk.to('cpu'), r_h)
             r_h.set_zorder(1000)
             # obs[0, 0] += 0.03
             # plot_obs_update(o_h_arr, obs)

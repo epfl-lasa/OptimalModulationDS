@@ -100,7 +100,12 @@ def main_loop():
         sphere_left = sphere + torch.tensor([0, -length/2, -length/2, 0])
         sphere_right = sphere + torch.tensor([0, length/2, -length/2, 0])
         line_lr = sphere_left + torch.linspace(0, 1, n_pts).reshape(-1, 1) * (sphere_right - sphere_left)
-        shelf = torch.vstack((shelf, line_down, line_lr))
+        left_wall_line = line_down + torch.tensor([0, -length/2, 0, 0])
+        right_wall_line = line_down + torch.tensor([0, length/2, 0, 0])
+        top_wall_line = line_lr + torch.tensor([0, 0, length/2, 0])
+        bottom_wall_line = line_lr + torch.tensor([0, 0, -length/2, 0])
+        shelf = torch.vstack((shelf, line_down, line_lr, left_wall_line, right_wall_line, top_wall_line, bottom_wall_line))
+        #shelf = torch.vstack((shelf, line_down, line_lr))
 
     ########################################
     ### Dummy obstacle
