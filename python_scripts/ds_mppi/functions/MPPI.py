@@ -192,7 +192,7 @@ class MPPI:
                 velocity_activation = (1-l_vel[:, None])
                 goal_activation = (q_prev-self.qf).norm(p=0.5, dim=1).clamp(0, 1).unsqueeze(1)
                 goal_activation[goal_activation < 0.3] = 0
-                total_activation = collision_activation * velocity_activation * goal_activation
+                total_activation = collision_activation #* velocity_activation #* goal_activation
                 self.kernel_activations[:, i-1] = total_activation.squeeze(1)
                 policy_velocity = total_activation * policy_value
                 # policy_velocity = velocity_activation * policy_value
