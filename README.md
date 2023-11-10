@@ -33,4 +33,6 @@ or
 To run 7d planar robot use ```python3 standalonePlanar7d.py``` (not as refined)
 
 ## Franka simulation in shelf-like environment
+![shelf](https://github.com/epfl-lasa/OptimalModulationDS/assets/22716499/c09470f3-6adf-421c-b704-d316392e73fd)
+
 ![shelf_anim](https://github.com/epfl-lasa/OptimalModulationDS/assets/22716499/f82c028c-2361-473c-b6c4-4cb73352b561)
