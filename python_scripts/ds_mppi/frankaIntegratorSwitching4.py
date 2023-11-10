@@ -75,7 +75,7 @@ def main_loop():
     DS3 = LinDS(q_3)
     DS4 = LinDS(q_4)
     DS_ARRAY = [DS1, DS2, DS3, DS4]
-
+    ds_order = [1,1,1,0,0,0,3,3,3,0,0,0,1,1,1,2,2,2]*5000
     #DS1 = SEDS('content/seds_right.mat', q_0.unsqueeze(1))
     #DS2 = SEDS('content/seds_left.mat', q_f.unsqueeze(1))
 
@@ -134,7 +134,8 @@ def main_loop():
             #     mppi_step.reset_DS(DS2)
             print('Switching DS!!')
             # mppi_step.switch_DS_idx(N_SUCCESS % 4)
-            mppi_step.switch_DS_idx(np.random.randint(4))
+            # mppi_step.switch_DS_idx(np.random.randint(4))
+            mppi_step.switch_DS_idx(ds_order[N_SUCCESS])
 
             # socket_send_state.send_pyobj(mppi_step.q_cur)
             status = f'1: Goal reached in {N_ITER_TRAJ:3d} iterations ({t_traj:4.2f} seconds). ' \

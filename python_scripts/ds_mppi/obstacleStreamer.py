@@ -87,8 +87,8 @@ def main_loop():
     r = 0.03
     n_pts = 9
     length = max(1, 2*n_pts-2)*r*1.5
-    z0 = 0.1
-    x0 = 0.45
+    z0 = 0.15
+    x0 = 0.4
     y0 = 0
     posA = torch.tensor([x0, y0, z0+length, r])
     posB = posA + torch.tensor([length, 0.0, 0.0, 0.0])
@@ -111,7 +111,7 @@ def main_loop():
 
     N_ITER = 0
     freq = config["obstacle_streamer"]["frequency"]
-    amplitude_array = torch.tensor([[0.0, 0.0, 0.1, 0],
+    amplitude_array = torch.tensor([[0.0, 0.0, 0.0, 0],
                                     [0.0, 0.0, 0.0, 0]])
     period_array = [1, 0.01]
     t_0 = time.time()
