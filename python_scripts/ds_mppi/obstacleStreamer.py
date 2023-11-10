@@ -104,7 +104,8 @@ def main_loop():
         right_wall_line = line_down + torch.tensor([0, length/2, 0, 0])
         top_wall_line = line_lr + torch.tensor([0, 0, length/2, 0])
         bottom_wall_line = line_lr + torch.tensor([0, 0, -length/2, 0])
-        shelf = torch.vstack((shelf, line_down, line_lr, left_wall_line, right_wall_line, top_wall_line, bottom_wall_line))
+        # shelf = torch.vstack((shelf, line_down, line_lr, left_wall_line, right_wall_line, top_wall_line, bottom_wall_line))
+        shelf = torch.vstack((shelf, line_down, line_lr, top_wall_line, bottom_wall_line))
         #shelf = torch.vstack((shelf, line_down, line_lr))
 
     ########################################

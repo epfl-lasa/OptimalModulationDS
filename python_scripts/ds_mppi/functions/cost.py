@@ -17,7 +17,7 @@ class Cost:
         stagnation_cost = 10*goal_cost * self.stagnation_cost(all_traj)
 
         fk_cost = 10*self.fk_cost(all_traj[:, -1, :])
-        rest_cost = 0*goal_cost * self.rest_cost(all_traj)
+        rest_cost = goal_cost * self.rest_cost(all_traj)
         total_cost = goal_cost + collision_cost + joint_limits_cost + stagnation_cost + fk_cost
         return total_cost
 

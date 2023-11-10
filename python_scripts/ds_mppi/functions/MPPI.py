@@ -129,7 +129,7 @@ class MPPI:
                 dotproduct = (E[:, :, 0] * nominal_velocity_normalized).sum(dim=-1)
                 self.dot_products[:, i-1] = dotproduct
                 #l_vel = generalized_sigmoid(dotproduct, 0, 1, -0.2, 0.0, 100)
-                l_vel = generalized_sigmoid(dotproduct, 0, 1, -1, -0.25, 10)
+                l_vel = generalized_sigmoid(dotproduct, 0, 1, -1, 0, 10)
 
             with record_function("TAG: Modulation-propagation"):
                 # calculate standard modulation coefficients
@@ -140,13 +140,13 @@ class MPPI:
                 # l_n[l_n < 0] = 0
                 # l_tau[l_tau < 1] = 1
                 # calculate own modulation coefficients
-                if 1:
+                if 0:
                     # for planar robot (units)
                     dist_low, dist_high = 0.0, 2
                     k_sigmoid = 3
                 else:
                     # for franka robot (meters)
-                    dist_low, dist_high = 0.03, 0.1
+                    dist_low, dist_high = 0.0, 0.1
                     k_sigmoid = 100
                 ln_min, ln_max = 0, 1
                 ltau_min, ltau_max = 1, 5

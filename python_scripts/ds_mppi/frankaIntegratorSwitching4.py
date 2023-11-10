@@ -75,7 +75,8 @@ def main_loop():
     DS3 = LinDS(q_3)
     DS4 = LinDS(q_4)
     DS_ARRAY = [DS1, DS2, DS3, DS4]
-    ds_order = [0,0,0,3,3,3,0,0,0,1,1,1,2,2,2,1,1,1]*5000
+    q_0 = q_2
+    ds_order = [1,1,1,1,0,0,0,0,3,3,3,3,0,0,0,0,1,1,1,1,2,2,2,2]*5000
     #DS1 = SEDS('content/seds_right.mat', q_0.unsqueeze(1))
     #DS2 = SEDS('content/seds_left.mat', q_f.unsqueeze(1))
 
@@ -127,7 +128,7 @@ def main_loop():
         print(q_des)
         status_msg = ''
         t_traj = time.time() - t_traj_start
-        if (torch.norm(mppi_step.q_cur - mppi_step.qf) < 0.1) and (N_ITER_TRAJ > 100):
+        if (torch.norm(mppi_step.q_cur - mppi_step.qf) < 0.4) and (N_ITER_TRAJ > 100):
             # if N_SUCCESS % 2 == 0:
             #     mppi_step.reset_DS(DS1)
             # else:
